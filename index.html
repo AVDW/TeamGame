@@ -1,0 +1,79 @@
+<!-- client.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shadow Frog Race</title>
+  <style>
+    canvas { border: 1px solid #333; background: #eee; }
+    #info { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>Shadow Frog Race</h2>
+  <div id="info">Connecting...</div>
+  <canvas id="game" width="400" height="600"></canvas>
+  <div>
+    <button onclick="move('up')">Up</button>
+    <button onclick="move('down')">Down</button>
+    <button onclick="move('left')">Left</button>
+    <button onclick="move('right')">Right</button>
+  </div>
+  <script>
+    const ws = new WebSocket('ws://localhost:8080');
+    let frogs = [];
+    let obstacles = [];
+    let timer = 0;
+    let yourId = null;
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'start') {
+        yourId = data.yourId;
+        document.getElementById('info').innerText = 'Game started!';
+      }
+      if (data.type === 'state') {
+        frogs = data.frogs;
+        obstacles = data.obstacles;
+        timer = Math.round(data.timer);
+        draw();
+      }
+      if (data.type === 'end') {
+        if (data.winner !== null) {
+          document.getElementById('info').innerText = `Team ${data.winner + 1} wins!`;
+        } else {
+          document.getElementById('info').innerText = 'Time up! No winner.';
+        }
+      }
+      if (data.type === 'error') {
+        document.getElementById('info').innerText = data.message;
+      }
+    };
+
+    function move(dir) {
+      // For demo, move frog 0 (can be changed to let user pick)
+      ws.send(JSON.stringify({ type: 'move', frogId: 0, dir }));
+    }
+
+    function draw() {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw obstacles
+      ctx.fillStyle = '#888';
+      obstacles.forEach(o => {
+        ctx.fillRect(o.x, o.y, 40, 40);
+      });
+      // Draw frogs
+      const colors = ['green', 'blue', 'red', 'orange'];
+      frogs.forEach((f, i) => {
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect(f.x, f.y, 20, 20);
+      });
+      // Draw timer
+      ctx.fillStyle = '#222';
+      ctx.font = '20px sans-serif';
+      ctx.fillText(`Time: ${timer}s`, 10, 30);
+    }
+  </script>
+</body>
+</html>
