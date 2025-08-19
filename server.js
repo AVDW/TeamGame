@@ -1,6 +1,7 @@
 // server.js
 const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: 8080 });
+const serverPort = process.env.PORT || 3001;
+const server = new WebSocket.Server({ port: serverPort });
 
 const NUM_PLAYERS = 2;
 const NUM_TEAMS = 4;
@@ -152,4 +153,4 @@ server.on('connection', (ws) => {
   });
 });
 
-console.log('Server running on ws://localhost:8080');
+console.log(`Server running on port ${serverProt}`);
