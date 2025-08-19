@@ -153,4 +153,4 @@ server.on('connection', (ws) => {
   });
 });
 
-console.log(`Server running on port ${serverProt}`);
+console.log(`Server running on port ${serverPort}`);
