@@ -1,0 +1,20 @@
+name = "sprite-race"
+main = "src/index.js"
+compatibility_date = "2025-05-01"
+
+# Serve the client from ./public. Non-file requests (like /ws) fall through
+# to the Worker's fetch handler.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# The game room lives in a single Durable Object instance that holds all
+# connected players, the sprites, obstacles and the tick loop.
+[[durable_objects.bindings]]
+name = "GAME"
+class_name = "GameRoom"
+
+# SQLite-backed class so the Durable Object works on the Workers free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]

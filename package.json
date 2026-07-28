@@ -1,19 +1,14 @@
 {
-  "name": "puzzlegame",
+  "name": "sprite-race",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "Multiplayer hidden-controls sprite race for Cloudflare Workers + Durable Objects",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "ws": "^8.18.3"
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "wrangler": "^4.20.0"
   }
 }

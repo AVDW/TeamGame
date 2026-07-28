@@ -1,79 +1,297 @@
-<!-- client.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Shadow Frog Race</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Sprite Race</title>
   <style>
-    canvas { border: 1px solid #333; background: #eee; }
-    #info { margin: 10px 0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; height: 100%;
+      background: #0f172a; color: #e2e8f0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      overscroll-behavior: none;
+    }
+    body { display: flex; flex-direction: column; align-items: center; }
+    .screen { width: 100%; max-width: 460px; padding: 16px; flex: 1; display: none; flex-direction: column; }
+    .screen.active { display: flex; }
+    h1 { font-size: 24px; margin: 6px 0 2px; text-align: center; }
+    .tag { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 14px; }
+    .card { background: #1e293b; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .card h3 { margin: 0 0 8px; font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+    input {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #334155;
+      background: #0f172a; color: #e2e8f0; font-size: 16px;
+    }
+    .seg { display: flex; gap: 8px; margin-top: 4px; }
+    .seg button {
+      flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #334155;
+      background: #0f172a; color: #e2e8f0; font-size: 16px; font-weight: 600;
+    }
+    .seg button.on { background: #2563eb; border-color: #2563eb; }
+    button.primary {
+      width: 100%; padding: 16px; border: none; border-radius: 12px;
+      background: #22c55e; color: #052e16; font-size: 18px; font-weight: 800;
+    }
+    button.primary:disabled { background: #334155; color: #64748b; }
+    button.ghost {
+      width: 100%; padding: 14px; border: 1px solid #334155; border-radius: 12px;
+      background: transparent; color: #e2e8f0; font-size: 16px; font-weight: 700; margin-top: 10px;
+    }
+    .players { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: #0f172a; border: 1px solid #334155; border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+    .count { font-size: 40px; font-weight: 800; text-align: center; }
+
+    /* Game screen */
+    #boardWrap { position: relative; width: 100%; max-width: 400px; margin: 0 auto; }
+    canvas { width: 100%; height: auto; display: block; border-radius: 12px; background: #f1f5f9; }
+    .hud { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; margin: 0 auto 8px; }
+    .timer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .hint { font-size: 12px; color: #94a3b8; }
+
+    /* D-pad */
+    .pad { margin: 18px auto 0; display: grid; grid-template-columns: repeat(3, 74px); grid-template-rows: repeat(3, 74px); gap: 10px; justify-content: center; }
+    .pad button {
+      border: none; border-radius: 16px; background: #334155; color: #e2e8f0;
+      font-size: 30px; font-weight: 800; touch-action: manipulation; user-select: none;
+    }
+    .pad button:active { background: #2563eb; transform: scale(0.94); }
+    .pad .up { grid-column: 2; grid-row: 1; }
+    .pad .left { grid-column: 1; grid-row: 2; }
+    .pad .right { grid-column: 3; grid-row: 2; }
+    .pad .down { grid-column: 2; grid-row: 3; }
+
+    /* End screen */
+    .banner { text-align: center; font-size: 26px; font-weight: 900; margin: 8px 0; }
+    .reveal { text-align: center; font-size: 15px; line-height: 1.5; }
+    .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin: 0 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    td { padding: 6px 4px; border-bottom: 1px solid #334155; font-size: 14px; }
+    .muted { color: #64748b; font-size: 12px; text-align: center; margin-top: 4px; }
   </style>
 </head>
 <body>
-  <h2>Shadow Frog Race</h2>
-  <div id="info">Connecting...</div>
-  <canvas id="game" width="400" height="600"></canvas>
-  <div>
-    <button onclick="move('up')">Up</button>
-    <button onclick="move('down')">Down</button>
-    <button onclick="move('left')">Left</button>
-    <button onclick="move('right')">Right</button>
-  </div>
-  <script>
-    const ws = new WebSocket('ws://localhost:8080');
-    let frogs = [];
-    let obstacles = [];
-    let timer = 0;
-    let yourId = null;
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'start') {
-        yourId = data.yourId;
-        document.getElementById('info').innerText = 'Game started!';
+  <!-- LOBBY -->
+  <section id="lobby" class="screen active">
+    <h1>🏁 Sprite Race</h1>
+    <div class="tag" id="conn">Connecting…</div>
+
+    <div class="card">
+      <h3>Your name</h3>
+      <input id="name" placeholder="e.g. Sam" maxlength="16" autocomplete="off" />
+    </div>
+
+    <div class="card">
+      <h3>Players in the room</h3>
+      <div class="count" id="count">0</div>
+      <div class="players" id="playerList"></div>
+    </div>
+
+    <div class="card">
+      <h3>How it works</h3>
+      <div style="font-size:14px; line-height:1.55; color:#cbd5e1;">
+        You'll be split into secret teams. Each team drives <b>one sprite</b> up
+        the screen — but <b>you're not told which sprite is yours</b>, and each of
+        you can only nudge it in <b>one hidden direction</b>. Tap around, watch the
+        board, and work out who controls what. First team to the top wins. 🏆
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Team size</h3>
+      <div class="seg" id="teamSize">
+        <button data-size="3">3 per team</button>
+        <button data-size="4" class="on">4 per team</button>
+      </div>
+    </div>
+
+    <button class="primary" id="startBtn" disabled>Start Race</button>
+    <div class="muted">Anyone can start once everyone's in.</div>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="screen">
+    <div class="hud">
+      <div class="hint">Find your sprite…</div>
+      <div class="timer" id="timer">0:00</div>
+    </div>
+    <div id="boardWrap">
+      <canvas id="canvas" width="400" height="600"></canvas>
+    </div>
+    <div class="pad">
+      <button class="up" data-dir="up">▲</button>
+      <button class="left" data-dir="left">◀</button>
+      <button class="right" data-dir="right">▶</button>
+      <button class="down" data-dir="down">▼</button>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section id="end" class="screen">
+    <div class="banner" id="banner"></div>
+    <div class="card reveal" id="reveal"></div>
+    <div class="card">
+      <h3>Final standings</h3>
+      <table id="standings"></table>
+    </div>
+    <button class="ghost" id="backBtn">Back to lobby</button>
+  </section>
+
+  <script>
+    const SPRITE_SIZE = 24;
+    let ws, teamSize = 4;
+    let sprites = [], obstacles = [], lastProgress = {};
+
+    // --- screen helper ---
+    function show(id) {
+      for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === id);
+    }
+
+    // --- websocket ---
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws`);
+      ws.onopen = () => { document.getElementById('conn').textContent = 'Connected — waiting for players'; };
+      ws.onclose = () => { document.getElementById('conn').textContent = 'Disconnected — reconnecting…'; setTimeout(connect, 1500); };
+      ws.onmessage = (e) => handle(JSON.parse(e.data));
+    }
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+    function handle(msg) {
+      switch (msg.type) {
+        case 'lobby':
+          document.getElementById('count').textContent = msg.count;
+          document.getElementById('playerList').innerHTML =
+            msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
+          document.getElementById('startBtn').disabled = msg.count < 1;
+          show('lobby');
+          break;
+        case 'inprogress':
+          document.getElementById('conn').textContent = 'A race is in progress — you\'ll join the next one';
+          show('lobby');
+          break;
+        case 'start':
+          lastProgress = {};
+          show('game');
+          break;
+        case 'state':
+          sprites = msg.sprites; obstacles = msg.obstacles;
+          document.getElementById('timer').textContent = fmt(msg.timer);
+          draw();
+          break;
+        case 'end':
+          renderEnd(msg);
+          show('end');
+          break;
       }
-      if (data.type === 'state') {
-        frogs = data.frogs;
-        obstacles = data.obstacles;
-        timer = Math.round(data.timer);
-        draw();
+    }
+
+    // --- lobby controls ---
+    document.getElementById('name').addEventListener('input', (e) => send({ type: 'setname', name: e.target.value }));
+    document.querySelectorAll('#teamSize button').forEach(b => {
+      b.addEventListener('click', () => {
+        teamSize = +b.dataset.size;
+        document.querySelectorAll('#teamSize button').forEach(x => x.classList.toggle('on', x === b));
+      });
+    });
+    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', teamSize }));
+    document.getElementById('backBtn').addEventListener('click', () => send({ type: 'reset' }));
+
+    // --- d-pad (pointer + keyboard). Every press is sent; the server decides
+    //     whether it counts. That's how the hidden controls stay hidden. ---
+    document.querySelectorAll('.pad button').forEach(b => {
+      const fire = (ev) => { ev.preventDefault(); send({ type: 'move', dir: b.dataset.dir }); };
+      b.addEventListener('pointerdown', fire);
+    });
+    const keymap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    window.addEventListener('keydown', (e) => {
+      if (keymap[e.key] && document.getElementById('game').classList.contains('active')) {
+        e.preventDefault(); send({ type: 'move', dir: keymap[e.key] });
       }
-      if (data.type === 'end') {
-        if (data.winner !== null) {
-          document.getElementById('info').innerText = `Team ${data.winner + 1} wins!`;
-        } else {
-          document.getElementById('info').innerText = 'Time up! No winner.';
+    });
+
+    // --- rendering ---
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // finish zone
+      ctx.fillStyle = 'rgba(34,197,94,0.12)';
+      ctx.fillRect(0, 0, canvas.width, 28);
+      ctx.strokeStyle = 'rgba(34,197,94,0.5)'; ctx.setLineDash([8, 6]);
+      ctx.beginPath(); ctx.moveTo(0, 28); ctx.lineTo(canvas.width, 28); ctx.stroke(); ctx.setLineDash([]);
+
+      // obstacles
+      for (const o of obstacles) {
+        ctx.fillStyle = o.moving ? '#ef4444' : '#475569';
+        roundRect(o.x, o.y, o.w, o.h, 5); ctx.fill();
+      }
+
+      // sprites
+      for (const s of sprites) {
+        // flash red briefly if it just got sent back to the start (a bump)
+        const prev = lastProgress[s.team];
+        const bumped = prev !== undefined && prev - s.progress > 0.3;
+        lastProgress[s.team] = s.progress;
+
+        ctx.fillStyle = bumped ? '#fca5a5' : s.color;
+        roundRect(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
+        // eyes for a bit of character
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(s.x + 5, s.y + 7, 4, 4);
+        ctx.fillRect(s.x + SPRITE_SIZE - 9, s.y + 7, 4, 4);
+        if (s.finished) {
+          ctx.fillStyle = '#052e16'; ctx.font = 'bold 14px sans-serif';
+          ctx.fillText('🏁', s.x + 3, s.y + 18);
         }
       }
-      if (data.type === 'error') {
-        document.getElementById('info').innerText = data.message;
+    }
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // --- end screen ---
+    function renderEnd(msg) {
+      const banner = document.getElementById('banner');
+      if (msg.youWon) { banner.textContent = '🏆 You won!'; banner.style.color = '#22c55e'; }
+      else if (msg.winnerName) { banner.textContent = `${msg.winnerName} team wins`; banner.style.color = '#e2e8f0'; }
+      else { banner.textContent = "Time's up!"; banner.style.color = '#e2e8f0'; }
+
+      const dirWord = { up: 'UP ▲', down: 'DOWN ▼', left: 'LEFT ◀', right: 'RIGHT ▶' };
+      const reveal = document.getElementById('reveal');
+      if (msg.yourTeam !== null && msg.yourColor) {
+        reveal.innerHTML =
+          `You were on the <b>${escapeHtml(msg.yourSpriteName)}</b> team` +
+          `<span class="swatch" style="background:${msg.yourColor}"></span><br>` +
+          `Your secret control was <b>${dirWord[msg.yourDir] || msg.yourDir}</b>.` +
+          `<div class="muted">Did you figure it out in time?</div>`;
+      } else {
+        reveal.innerHTML = `You were spectating this round — you'll be dealt in next time.`;
       }
-    };
 
-    function move(dir) {
-      // For demo, move frog 0 (can be changed to let user pick)
-      ws.send(JSON.stringify({ type: 'move', frogId: 0, dir }));
+      document.getElementById('standings').innerHTML = msg.standings.map((s, i) => `
+        <tr>
+          <td style="width:24px;color:#64748b;">${i + 1}</td>
+          <td><span class="swatch" style="background:${s.color}"></span> ${escapeHtml(s.name)}</td>
+          <td style="text-align:right;">${s.finished ? '🏁 finished' : Math.round(s.progress * 100) + '%'}</td>
+          <td style="text-align:right;color:#64748b;">${s.bump} bumps</td>
+        </tr>`).join('');
     }
 
-    function draw() {
-      const canvas = document.getElementById('game');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Draw obstacles
-      ctx.fillStyle = '#888';
-      obstacles.forEach(o => {
-        ctx.fillRect(o.x, o.y, 40, 40);
-      });
-      // Draw frogs
-      const colors = ['green', 'blue', 'red', 'orange'];
-      frogs.forEach((f, i) => {
-        ctx.fillStyle = colors[i % colors.length];
-        ctx.fillRect(f.x, f.y, 20, 20);
-      });
-      // Draw timer
-      ctx.fillStyle = '#222';
-      ctx.font = '20px sans-serif';
-      ctx.fillText(`Time: ${timer}s`, 10, 30);
-    }
+    // --- utils ---
+    function fmt(sec) { const m = Math.floor(sec / 60), s = sec % 60; return `${m}:${String(s).padStart(2, '0')}`; }
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    connect();
   </script>
 </body>
 </html>
