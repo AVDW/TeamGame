@@ -137,7 +137,7 @@
   <script src="/confetti.js"></script>
   <script>
     let ws;
-    let myDirs = [];
+    let myDirs = [], myYou = null;
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
@@ -160,6 +160,7 @@
         case 'lobby':
           confetti.stop();
           board.stop();
+          myYou = null; board.setYou(null);
           document.getElementById('count').textContent = msg.count;
           document.getElementById('playerList').innerHTML =
             msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
@@ -172,6 +173,8 @@
         case 'start':
           confetti.stop();
           myDirs = msg.dirs || [];
+          myYou = msg.you || null;           // set only in "reveal" mode
+          board.setYou(myYou ? myYou.team : null);
           configurePad();
           show('game');
           board.start();
@@ -236,8 +239,14 @@
         b.style.display = myDirs.includes(b.dataset.dir) ? '' : 'none';
       });
       const hint = document.querySelector('.hint');
+      const dirs = myDirs.map(d => DIR_LABEL[d]).join(' & ');
       if (!myDirs.length) hint.textContent = 'Spectating this round…';
-      else hint.innerHTML = `You control <b>${myDirs.map(d => DIR_LABEL[d]).join(' & ')}</b> — find your sprite!`;
+      else if (myYou) {
+        const mk = Board.MARKERS[myYou.team % Board.MARKERS.length];
+        hint.innerHTML = `You control <b>${dirs}</b> · your sprite is <span class="mini" style="background:${myYou.color}">${mk}</span> <b>${escapeHtml(myYou.name)}</b>`;
+      } else {
+        hint.innerHTML = `You control <b>${dirs}</b> — find your sprite!`;
+      }
     }
 
     // --- rendering (shared renderers in board.js / confetti.js) ---

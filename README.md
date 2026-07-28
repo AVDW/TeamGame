@@ -10,7 +10,10 @@ the top.
 * **Hidden sprite** — you're never told which sprite your team controls. Your
   phone shows only the button(s) you control, so you press and watch the board
   to work out which sprite responds. State broadcasts carry no ownership info,
-  so it can't be reverse-engineered from network traffic.
+  so it can't be reverse-engineered from network traffic. (An optional **"Your
+  sprite: Shown"** toggle on the dashboard turns this off for an easier mode —
+  each player's own phone then marks their sprite with a **YOU** ring, while the
+  shared big screen still reveals nothing.)
 * **Split controls** — a team always covers all four directions, split across
   its members. In a full team of four that's one direction each; in a smaller
   team each person controls two or more. Nobody is ever left with nothing to do.
@@ -68,8 +71,9 @@ Open **`/display`** on a TV or projector at the front of the room. It's the
 game's control surface as well as the shared view:
 
 * a **setup panel** to configure the next race before it starts — race length,
-  difficulty (obstacle count / trap speed / knockback), and number of teams
-  (auto or fixed) — plus the **Launch Race** button. The game can *only* be
+  difficulty (obstacle count / trap speed / knockback), number of teams (auto or
+  fixed), and whether each player's sprite is Hidden (the default challenge) or
+  Shown (easy mode) — plus the **Launch Race** button. The game can *only* be
   started here, never from a player's phone.
 * a compact **join panel** with a QR code and URL (rendered locally from a
   vendored library, no external call) and the count of pilots ready.
