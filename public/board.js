@@ -59,55 +59,56 @@ const Board = (() => {
     const trails = new Map();  // team -> [{x, y}]
     const trailT = new Map();  // team -> last-recorded timestamp
 
-    // Snapshot buffer for interpolation.
-    let prev = null, next = null, prevT = 0, nextT = 0;
-    let raf = null;
+    // Rendering is decoupled from packet timing with exponential smoothing:
+    // every frame the drawn position eases a fraction of the way toward the
+    // latest server position. This is robust to jittery packet arrival (which
+    // Cloudflare's Durable Object alarms + the network introduce) — it never
+    // jumps forward to "catch up" and never stalls, unlike two-point
+    // interpolation that assumes evenly-spaced packets.
+    const SMOOTH_TAU = 55; // ms; higher = smoother but laggier
+    let target = null;         // latest server snapshot
+    const rpos = new Map();    // entity key -> { x, y } (eased render position)
+    let raf = null, lastFrameT = 0;
 
-    // Feed a fresh server state; keep the previous one to interpolate from.
-    function update(state) {
-      const now = performance.now();
-      if (!next) { prev = state; next = state; prevT = now; nextT = now; }
-      else { prev = next; next = state; prevT = nextT; nextT = now; }
-    }
+    function update(state) { target = state; }
 
-    // Interpolated view of the world, rendered ~one tick behind real time so
-    // there's always a "next" snapshot to head toward.
-    function interpolated() {
-      if (!next) return null;
-      const span = nextT - prevT;
-      let a = span > 0 ? (performance.now() - nextT) / span : 1;
-      a = a < 0 ? 0 : a > 1 ? 1 : a;
-      if (!prev || span === 0) return next;
-
-      const prevByTeam = new Map(prev.sprites.map((s) => [s.team, s]));
-      const sprites = next.sprites.map((s) => {
-        const p = prevByTeam.get(s.team) || s;
-        return { ...s, x: p.x + (s.x - p.x) * a, y: p.y + (s.y - p.y) * a };
-      });
-      const obstacles = next.obstacles.map((o, i) => {
-        const p = prev.obstacles[i] || o;
-        return { ...o, x: p.x + (o.x - p.x) * a, y: p.y + (o.y - p.y) * a };
-      });
-      return { sprites, obstacles };
+    // Ease one entity's rendered position toward its target; snap on first sight.
+    function ease(key, tx, ty, k) {
+      let r = rpos.get(key);
+      if (!r) { r = { x: tx, y: ty }; rpos.set(key, r); }
+      else { r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
+      return r;
     }
 
     function frame() {
-      const world = interpolated();
-      if (world) {
+      const now = performance.now();
+      const dt = lastFrameT ? Math.min(100, now - lastFrameT) : 16;
+      lastFrameT = now;
+      if (target) {
+        const k = 1 - Math.exp(-dt / SMOOTH_TAU); // frame-rate independent
+        const sprites = target.sprites.map((s) => {
+          const r = ease('s' + s.team, s.x, s.y, k);
+          return { ...s, x: r.x, y: r.y };
+        });
+        const obstacles = target.obstacles.map((o, i) => {
+          const r = ease('o' + i, o.x, o.y, k);
+          return { ...o, x: r.x, y: r.y };
+        });
         let leadTeam = null;
         if (opts.showLead) {
           let best = -1;
-          for (const s of world.sprites) if (s.progress > best) { best = s.progress; leadTeam = s.team; }
+          for (const s of sprites) if (s.progress > best) { best = s.progress; leadTeam = s.team; }
         }
-        draw({ sprites: world.sprites, obstacles: world.obstacles, leadTeam });
+        draw({ sprites, obstacles, leadTeam });
       }
       raf = requestAnimationFrame(frame);
     }
 
-    function start() { if (!raf) raf = requestAnimationFrame(frame); }
+    function start() { if (!raf) { lastFrameT = 0; raf = requestAnimationFrame(frame); } }
     function stop() {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      prev = next = null;
+      target = null;
+      rpos.clear();
       trails.clear(); trailT.clear();
     }
 
