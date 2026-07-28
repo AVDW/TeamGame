@@ -93,22 +93,15 @@
       <h3>How it works</h3>
       <div style="font-size:14px; line-height:1.55; color:#cbd5e1;">
         You'll be split into secret teams. Each team drives <b>one sprite</b> up
-        the screen — but <b>you're not told which sprite is yours</b>, and each of
-        you can only nudge it in <b>one hidden direction</b>. Tap around, watch the
-        board, and work out who controls what. First team to the top wins. 🏆
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Team size</h3>
-      <div class="seg" id="teamSize">
-        <button data-size="3">3 per team</button>
-        <button data-size="4" class="on">4 per team</button>
+        the screen. You'll each control <b>just one direction</b> (we'll show you
+        which) — but <b>you're not told which sprite is yours</b>. Press your
+        button, watch the board to spot your sprite, and coordinate with your team
+        to weave past the traps. First team to the top wins. 🏆
       </div>
     </div>
 
     <button class="primary" id="startBtn" disabled>Start Race</button>
-    <div class="muted">Anyone can start once everyone's in.</div>
+    <div class="muted">Anyone can start once everyone's in. Teams are formed automatically — the more players, the more sprites to race.</div>
   </section>
 
   <!-- GAME -->
@@ -141,8 +134,9 @@
 
   <script>
     const SPRITE_SIZE = 24;
-    let ws, teamSize = 4;
-    let sprites = [], obstacles = [], lastProgress = {};
+    let ws;
+    let sprites = [], obstacles = [], lastProgress = {}, myDirs = [];
+    const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
     function show(id) {
@@ -173,7 +167,9 @@
           show('lobby');
           break;
         case 'start':
+          myDirs = msg.dirs || [];
           lastProgress = {};
+          configurePad();
           show('game');
           break;
         case 'state':
@@ -190,27 +186,32 @@
 
     // --- lobby controls ---
     document.getElementById('name').addEventListener('input', (e) => send({ type: 'setname', name: e.target.value }));
-    document.querySelectorAll('#teamSize button').forEach(b => {
-      b.addEventListener('click', () => {
-        teamSize = +b.dataset.size;
-        document.querySelectorAll('#teamSize button').forEach(x => x.classList.toggle('on', x === b));
-      });
-    });
-    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', teamSize }));
+    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start' }));
     document.getElementById('backBtn').addEventListener('click', () => send({ type: 'reset' }));
 
-    // --- d-pad (pointer + keyboard). Every press is sent; the server decides
-    //     whether it counts. That's how the hidden controls stay hidden. ---
+    // --- d-pad. Only the button(s) a player actually controls are shown, so
+    //     nobody guesses their direction — they just have to find their sprite. ---
     document.querySelectorAll('.pad button').forEach(b => {
-      const fire = (ev) => { ev.preventDefault(); send({ type: 'move', dir: b.dataset.dir }); };
+      const fire = (ev) => { ev.preventDefault(); if (myDirs.includes(b.dataset.dir)) send({ type: 'move', dir: b.dataset.dir }); };
       b.addEventListener('pointerdown', fire);
     });
     const keymap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
     window.addEventListener('keydown', (e) => {
-      if (keymap[e.key] && document.getElementById('game').classList.contains('active')) {
-        e.preventDefault(); send({ type: 'move', dir: keymap[e.key] });
+      const dir = keymap[e.key];
+      if (dir && myDirs.includes(dir) && document.getElementById('game').classList.contains('active')) {
+        e.preventDefault(); send({ type: 'move', dir });
       }
     });
+
+    // Show only the controlled buttons and tell the player their role.
+    function configurePad() {
+      document.querySelectorAll('.pad button').forEach(b => {
+        b.style.display = myDirs.includes(b.dataset.dir) ? '' : 'none';
+      });
+      const hint = document.querySelector('.hint');
+      if (!myDirs.length) hint.textContent = 'Spectating this round…';
+      else hint.innerHTML = `You control <b>${myDirs.map(d => DIR_LABEL[d]).join(' & ')}</b> — find your sprite!`;
+    }
 
     // --- rendering ---
     const canvas = document.getElementById('canvas');
@@ -266,14 +267,15 @@
       else if (msg.winnerName) { banner.textContent = `${msg.winnerName} team wins`; banner.style.color = '#e2e8f0'; }
       else { banner.textContent = "Time's up!"; banner.style.color = '#e2e8f0'; }
 
-      const dirWord = { up: 'UP ▲', down: 'DOWN ▼', left: 'LEFT ◀', right: 'RIGHT ▶' };
       const reveal = document.getElementById('reveal');
       if (msg.yourTeam !== null && msg.yourColor) {
+        const dirs = (msg.yourDirs || []).map(d => DIR_LABEL[d] || d).join(' & ');
+        const plural = (msg.yourDirs || []).length > 1;
         reveal.innerHTML =
           `You were on the <b>${escapeHtml(msg.yourSpriteName)}</b> team` +
           `<span class="swatch" style="background:${msg.yourColor}"></span><br>` +
-          `Your secret control was <b>${dirWord[msg.yourDir] || msg.yourDir}</b>.` +
-          `<div class="muted">Did you figure it out in time?</div>`;
+          `Your control${plural ? 's were' : ' was'} <b>${dirs}</b>.` +
+          `<div class="muted">Did you spot your sprite in time?</div>`;
       } else {
         reveal.innerHTML = `You were spectating this round — you'll be dealt in next time.`;
       }

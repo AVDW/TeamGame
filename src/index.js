@@ -5,14 +5,18 @@
 // bottom of the screen to the top.
 //
 // The twists:
-//  * Hidden sprite  — a player is never told which sprite their team controls.
-//  * Split controls — each player's input only counts for ONE direction, and we
-//                     never tell them which. Enforced on the server so the
-//                     client protocol can't leak it.
-//  * Moving traps   — some obstacles patrol back and forth.
+//  * Hidden sprite   — a player is never told which sprite their team controls.
+//  * Split controls  — a team always covers all four directions, split across
+//                      its members. Small teams mean each player controls more
+//                      directions; a full team of four is one direction each.
+//                      Enforced server-side; state broadcasts never reveal which
+//                      sprite a player drives, so they must find it themselves.
+//  * Auto-balancing  — the server splits whoever's connected into 2-4 teams so
+//                      it's always a race, whatever the headcount.
+//  * Moving traps    — some obstacles patrol back and forth.
 //
-// Players must experiment ("which button does something? which sprite jumped?")
-// and coordinate with teammates to win.
+// Players must watch the board ("which sprite did my button move?") and
+// coordinate with teammates to win.
 
 // ---- Tunables -------------------------------------------------------------
 const GAME_WIDTH = 400;
@@ -22,6 +26,7 @@ const STEP = 20; // px moved per honoured press
 const TICK_MS = 100; // server tick
 const GAME_SECONDS = 120;
 const COLLISION_PENALTY = 3; // seconds lost when a sprite hits a trap
+const MAX_TEAMS = 4; // cap on sprites so the board stays readable
 const START_MARGIN = 12;
 const START_Y = GAME_HEIGHT - SPRITE_SIZE - START_MARGIN;
 
@@ -61,7 +66,7 @@ export class GameRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.players = new Map(); // ws -> { ws, id, name, team, dir }
+    this.players = new Map(); // ws -> { ws, id, name, team, dirs }
     this.sprites = [];
     this.obstacles = [];
     this.gameStarted = false;
@@ -80,7 +85,7 @@ export class GameRoom {
   }
 
   onConnect(ws) {
-    const player = { ws, id: this.nextId++, name: null, team: null, dir: null };
+    const player = { ws, id: this.nextId++, name: null, team: null, dirs: [] };
     this.players.set(ws, player);
     ws.addEventListener('message', (evt) => this.onMessage(player, evt.data));
     ws.addEventListener('close', () => this.onClose(player));
@@ -123,7 +128,7 @@ export class GameRoom {
     }
 
     if (data.type === 'start') {
-      if (!this.gameStarted) this.startGame(data.teamSize);
+      if (!this.gameStarted) this.startGame();
       return;
     }
 
@@ -134,24 +139,50 @@ export class GameRoom {
 
     if (data.type === 'move') {
       if (!this.gameStarted || player.team === null) return;
-      // The heart of "split controls": only the player's secret direction
-      // counts. Every other press is silently dropped, so nothing in the
-      // protocol reveals which direction (or sprite) a player controls.
-      if (data.dir !== player.dir) return;
+      // Only directions this player was assigned count. Enforced here so the
+      // protocol never reveals which sprite a player drives — they see their
+      // buttons, but have to watch the board to learn which sprite is theirs.
+      if (!player.dirs.includes(data.dir)) return;
       this.moveSprite(player.team, data.dir);
       return;
     }
   }
 
   // ---- game lifecycle -----------------------------------------------------
-  startGame(requestedSize) {
-    const size = requestedSize === 3 || requestedSize === 4 ? requestedSize : 4;
+  // Auto-balance: aim for teams of ~3, but always at least 2 teams (so it's a
+  // race) and at most MAX_TEAMS (so the board stays readable). With 1 player
+  // there's only a solo practice run.
+  teamCount(n) {
+    if (n <= 1) return n;
+    return Math.max(2, Math.min(MAX_TEAMS, Math.round(n / 3)));
+  }
+
+  // Split a team's four directions across its members so that EVERY direction
+  // is covered and EVERY member gets at least one button. Fewer members => each
+  // gets more directions; five+ members => some directions are shared.
+  assignDirections(members) {
+    const dirs = shuffle(['up', 'down', 'left', 'right']);
+    const buckets = members.map(() => []);
+    // Pass 1: hand out the four directions, cycling through members — this
+    // guarantees all four are covered.
+    dirs.forEach((d, k) => buckets[k % members.length].push(d));
+    // Pass 2: any member still empty (only possible with 5+ members) shares an
+    // existing direction, so nobody is left with nothing to press.
+    buckets.forEach((b, i) => {
+      if (b.length === 0) b.push(dirs[i % dirs.length]);
+    });
+    members.forEach((m, i) => (m.dirs = buckets[i]));
+  }
+
+  startGame() {
     const list = shuffle([...this.players.values()]);
     if (list.length < 1) return;
 
-    // Chunk shuffled players into teams; each team drives one sprite.
-    const teams = [];
-    for (let i = 0; i < list.length; i += size) teams.push(list.slice(i, i + size));
+    // Distribute players as evenly as possible across the chosen number of
+    // teams (sizes differ by at most one).
+    const count = this.teamCount(list.length);
+    const teams = Array.from({ length: count }, () => []);
+    list.forEach((p, i) => teams[i % count].push(p));
 
     this.sprites = [];
     teams.forEach((members, t) => {
@@ -165,23 +196,19 @@ export class GameRoom {
       this.placeSpriteAtStart(sprite, t, teams.length);
       this.sprites.push(sprite);
 
-      // Assign one live direction per player. "up" is always covered so the
-      // race is winnable; the rest are spread over left/right/down. Because
-      // members are shuffled, who-controls-what is random and hidden.
-      const roster = shuffle([...members]);
-      const rest = shuffle(['left', 'right', 'down']);
-      roster.forEach((m, idx) => {
-        m.team = t;
-        m.dir = idx === 0 ? 'up' : rest[(idx - 1) % rest.length];
-      });
+      members.forEach((m) => (m.team = t));
+      this.assignDirections(members);
     });
 
     this.buildObstacles();
     this.timer = GAME_SECONDS;
     this.gameStarted = true;
 
-    // Deliberately minimal: no sprite, team or direction leaks to the client.
-    for (const p of this.players.values()) this.send(p.ws, { type: 'start' });
+    // Tell each player which button(s) they control — but still NOT which
+    // sprite is theirs.
+    for (const p of this.players.values()) {
+      this.send(p.ws, { type: 'start', dirs: p.dirs });
+    }
     this.scheduleTick();
     this.broadcastState();
   }
@@ -212,7 +239,7 @@ export class GameRoom {
         yourTeam: p.team,
         yourColor: mySprite ? mySprite.color : null,
         yourSpriteName: mySprite ? mySprite.name : null,
-        yourDir: p.dir,
+        yourDirs: p.dirs,
         youWon: p.team !== null && p.team === winner,
       });
     }
@@ -225,7 +252,7 @@ export class GameRoom {
     this.obstacles = [];
     for (const p of this.players.values()) {
       p.team = null;
-      p.dir = null;
+      p.dirs = [];
     }
     this.broadcastLobby();
   }

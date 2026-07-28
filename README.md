@@ -7,27 +7,39 @@ the top.
 
 ## The twist
 
-* **Hidden sprite** — you're never told which sprite your team controls.
-* **Split controls** — each teammate's taps only count for **one** direction,
-  and you're not told which. Enforced on the server, so nothing the phone
-  receives can leak it.
+* **Hidden sprite** — you're never told which sprite your team controls. Your
+  phone shows only the button(s) you control, so you press and watch the board
+  to work out which sprite responds. State broadcasts carry no ownership info,
+  so it can't be reverse-engineered from network traffic.
+* **Split controls** — a team always covers all four directions, split across
+  its members. In a full team of four that's one direction each; in a smaller
+  team each person controls two or more. Nobody is ever left with nothing to do.
+* **Auto-balanced teams** — the server splits whoever's connected into 2–4
+  teams, so it's always a race whatever the headcount (more players → more
+  sprites).
 * **Moving traps** — red obstacles patrol left and right; grey ones sit still.
   Hit any of them and your sprite is sent back to the start with a time penalty.
 * **Every press moves it** — any teammate's valid press nudges the sprite
-  immediately, so a confused teammate pushing the wrong way is part of the fun.
+  immediately, so a teammate pushing the wrong way is part of the fun.
 
-Tap around, watch which sprite jumps, and coordinate with your team to figure
-out who controls what. First team to the top wins. At the end, each player gets
-a personal reveal: their sprite, their secret direction, and whether they won.
+Watch which sprite your button moves, then coordinate with your team to weave to
+the top. First team to the top wins. At the end, each player gets a personal
+reveal: their sprite, their direction(s), and whether they won.
 
 ## How it plays
 
 1. Everyone opens the link and enters a name.
-2. Anyone taps **Start Race** and picks a team size (3 or 4).
-3. Players are randomly split into teams; each team drives one sprite.
+2. Anyone taps **Start Race**.
+3. The server auto-balances everyone into 2–4 teams; each team drives one sprite
+   and collectively controls all four directions.
 4. Race to the top before the 2-minute timer runs out. If time expires, the
    sprite that got furthest wins.
 5. Tap **Back to lobby** to play again with fresh teams.
+
+**Best with 6+ players** (two or more teams). With only a couple of people it
+still works — each becomes a solo racer controlling their whole sprite — but the
+"find your sprite" deduction really comes alive once there are several sprites
+on the board.
 
 ## Run locally
 
