@@ -93,9 +93,10 @@
       <h3>How it works</h3>
       <div style="font-size:14px; line-height:1.55; color:#cbd5e1;">
         You'll be split into secret teams. Each team drives <b>one sprite</b> up
-        the screen — but <b>you're not told which sprite is yours</b>, and each of
-        you can only nudge it in <b>one hidden direction</b>. Tap around, watch the
-        board, and work out who controls what. First team to the top wins. 🏆
+        the screen. You'll each control <b>just one direction</b> (we'll show you
+        which) — but <b>you're not told which sprite is yours</b>. Press your
+        button, watch the board to spot your sprite, and coordinate with your team
+        to weave past the traps. First team to the top wins. 🏆
       </div>
     </div>
 
@@ -142,7 +143,8 @@
   <script>
     const SPRITE_SIZE = 24;
     let ws, teamSize = 4;
-    let sprites = [], obstacles = [], lastProgress = {};
+    let sprites = [], obstacles = [], lastProgress = {}, myDirs = [];
+    const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
     function show(id) {
@@ -173,7 +175,9 @@
           show('lobby');
           break;
         case 'start':
+          myDirs = msg.dirs || [];
           lastProgress = {};
+          configurePad();
           show('game');
           break;
         case 'state':
@@ -199,18 +203,29 @@
     document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', teamSize }));
     document.getElementById('backBtn').addEventListener('click', () => send({ type: 'reset' }));
 
-    // --- d-pad (pointer + keyboard). Every press is sent; the server decides
-    //     whether it counts. That's how the hidden controls stay hidden. ---
+    // --- d-pad. Only the button(s) a player actually controls are shown, so
+    //     nobody guesses their direction — they just have to find their sprite. ---
     document.querySelectorAll('.pad button').forEach(b => {
-      const fire = (ev) => { ev.preventDefault(); send({ type: 'move', dir: b.dataset.dir }); };
+      const fire = (ev) => { ev.preventDefault(); if (myDirs.includes(b.dataset.dir)) send({ type: 'move', dir: b.dataset.dir }); };
       b.addEventListener('pointerdown', fire);
     });
     const keymap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
     window.addEventListener('keydown', (e) => {
-      if (keymap[e.key] && document.getElementById('game').classList.contains('active')) {
-        e.preventDefault(); send({ type: 'move', dir: keymap[e.key] });
+      const dir = keymap[e.key];
+      if (dir && myDirs.includes(dir) && document.getElementById('game').classList.contains('active')) {
+        e.preventDefault(); send({ type: 'move', dir });
       }
     });
+
+    // Show only the controlled buttons and tell the player their role.
+    function configurePad() {
+      document.querySelectorAll('.pad button').forEach(b => {
+        b.style.display = myDirs.includes(b.dataset.dir) ? '' : 'none';
+      });
+      const hint = document.querySelector('.hint');
+      if (!myDirs.length) hint.textContent = 'Spectating this round…';
+      else hint.innerHTML = `You control <b>${myDirs.map(d => DIR_LABEL[d]).join(' & ')}</b> — find your sprite!`;
+    }
 
     // --- rendering ---
     const canvas = document.getElementById('canvas');

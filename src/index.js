@@ -180,8 +180,11 @@ export class GameRoom {
     this.timer = GAME_SECONDS;
     this.gameStarted = true;
 
-    // Deliberately minimal: no sprite, team or direction leaks to the client.
-    for (const p of this.players.values()) this.send(p.ws, { type: 'start' });
+    // Tell each player which direction(s) they control so the client can show
+    // only the buttons that work — but still NOT which sprite is theirs.
+    for (const p of this.players.values()) {
+      this.send(p.ws, { type: 'start', dirs: p.dir ? [p.dir] : [] });
+    }
     this.scheduleTick();
     this.broadcastState();
   }
