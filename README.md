@@ -18,7 +18,11 @@ the top.
   teams, so it's always a race whatever the headcount (more players → more
   sprites).
 * **Moving traps** — red obstacles patrol left and right; grey ones sit still.
-  Hit any of them and your sprite is sent back to the start with a time penalty.
+  Hit any of them and your sprite is knocked back down a bit (not a full reset)
+  with a small time penalty, plus a brief moment of immunity so you don't
+  chain-crash on the same trap.
+* **Winner celebration** — the dashboard (and each winning player's phone) rains
+  confetti when a race is won.
 * **Every press moves it** — any teammate's valid press nudges the sprite
   immediately, so a teammate pushing the wrong way is part of the fun.
 
@@ -52,6 +56,22 @@ npm run dev
 a few browser tabs/phones on the same network to test. Arrow keys work on
 desktop; the on-screen d-pad works on touch.
 
+## Front-of-room dashboard
+
+Open **`/display`** on a TV or projector at the front of the room. It's a
+big-screen spectator view showing:
+
+* a **join QR code** on the waiting screen — players scan it to open the game
+  on their phone (rendered locally from a vendored library, no external call),
+* the live race board with the current leader crowned,
+* a **standings** leaderboard (who's in the lead, progress %, and crashes),
+* an **input-activity** meter (inputs/sec, a live sparkline, and total inputs).
+
+It connects as a spectator (`{type:'spectate'}`), so it never joins a team or
+counts as a player. Crucially it shows **only board-equivalent aggregates** —
+never a player→sprite or player→direction mapping, and no per-direction
+breakdown — so having it visible to everyone gives no player an advantage.
+
 ## Deploy to Cloudflare
 
 ```bash
@@ -67,7 +87,8 @@ After deploy, share the `*.workers.dev` URL with the office.
 | File | Purpose |
 | --- | --- |
 | `src/index.js` | The Worker entry + the `GameRoom` Durable Object (players, sprites, obstacles, tick loop, win logic). One shared room named `main`. |
-| `public/index.html` | The whole client — lobby, canvas board, d-pad, and the end-of-round reveal. |
+| `public/index.html` | The player client — lobby, canvas board, d-pad, and the end-of-round reveal. |
+| `public/display.html` | The front-of-room dashboard (served at `/display`). |
 | `wrangler.toml` | Cloudflare config: static assets from `public/`, the Durable Object binding, and the SQLite migration. |
 
 The client protocol is deliberately thin: the phone sends every button press as

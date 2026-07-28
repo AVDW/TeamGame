@@ -45,7 +45,7 @@
 
     /* Game screen */
     #boardWrap { position: relative; width: 100%; max-width: 400px; margin: 0 auto; }
-    canvas { width: 100%; height: auto; display: block; border-radius: 12px; background: #f1f5f9; }
+    #canvas { width: 100%; height: auto; display: block; border-radius: 12px; background: #f1f5f9; }
     .hud { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; margin: 0 auto 8px; }
     .timer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .hint { font-size: 12px; color: #94a3b8; }
@@ -132,10 +132,12 @@
     <button class="ghost" id="backBtn">Back to lobby</button>
   </section>
 
+  <canvas id="fx" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50;"></canvas>
+
   <script>
     const SPRITE_SIZE = 24;
     let ws;
-    let sprites = [], obstacles = [], lastProgress = {}, myDirs = [];
+    let sprites = [], obstacles = [], myDirs = [];
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
@@ -168,7 +170,6 @@
           break;
         case 'start':
           myDirs = msg.dirs || [];
-          lastProgress = {};
           configurePad();
           show('game');
           break;
@@ -233,12 +234,8 @@
 
       // sprites
       for (const s of sprites) {
-        // flash red briefly if it just got sent back to the start (a bump)
-        const prev = lastProgress[s.team];
-        const bumped = prev !== undefined && prev - s.progress > 0.3;
-        lastProgress[s.team] = s.progress;
-
-        ctx.fillStyle = bumped ? '#fca5a5' : s.color;
+        // flash red briefly right after a trap knocks the sprite back
+        ctx.fillStyle = s.grace ? '#fca5a5' : s.color;
         roundRect(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
         // eyes for a bit of character
         ctx.fillStyle = '#fff';
@@ -260,10 +257,37 @@
       ctx.closePath();
     }
 
+    // --- winner confetti ---
+    const fx = document.getElementById('fx'), fxc = fx.getContext('2d');
+    let fxParts = [], fxUntil = 0, fxRAF = null, fxColors = ['#22c55e', '#fbbf24', '#38bdf8', '#ffffff'];
+    function fxNew() {
+      return { x: Math.random() * fx.width, y: -20 - Math.random() * 300, vx: (Math.random() - 0.5) * 3,
+        vy: 4 + Math.random() * 5, s: 5 + Math.random() * 7, c: fxColors[Math.floor(Math.random() * fxColors.length)],
+        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3 };
+    }
+    function celebrate(color) {
+      if (color) fxColors = [color, '#fbbf24', '#ffffff', '#38bdf8'];
+      fx.width = innerWidth; fx.height = innerHeight;
+      fxParts = Array.from({ length: 140 }, fxNew);
+      fxUntil = performance.now() + 5500;
+      if (!fxRAF) fxRAF = requestAnimationFrame(fxTick);
+    }
+    function fxTick(now) {
+      fxc.clearRect(0, 0, fx.width, fx.height);
+      for (const p of fxParts) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.r += p.vr;
+        if (p.y > fx.height + 20 && now < fxUntil) { Object.assign(p, fxNew()); p.y = -20; }
+        fxc.save(); fxc.translate(p.x, p.y); fxc.rotate(p.r); fxc.fillStyle = p.c;
+        fxc.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); fxc.restore();
+      }
+      if (now < fxUntil || fxParts.some(p => p.y < fx.height + 20)) fxRAF = requestAnimationFrame(fxTick);
+      else { fxRAF = null; fxc.clearRect(0, 0, fx.width, fx.height); }
+    }
+
     // --- end screen ---
     function renderEnd(msg) {
       const banner = document.getElementById('banner');
-      if (msg.youWon) { banner.textContent = '🏆 You won!'; banner.style.color = '#22c55e'; }
+      if (msg.youWon) { banner.textContent = '🏆 You won!'; banner.style.color = '#22c55e'; celebrate(msg.yourColor); }
       else if (msg.winnerName) { banner.textContent = `${msg.winnerName} team wins`; banner.style.color = '#e2e8f0'; }
       else { banner.textContent = "Time's up!"; banner.style.color = '#e2e8f0'; }
 
