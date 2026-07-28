@@ -79,8 +79,13 @@ red team's sprite; keep any new hazard type visually patterned, not flat.
 
 ## The board (canvas)
 
-All board drawing goes through `Board.attach(canvas, opts).draw(state)` in
-`public/board.js` — do not hand-roll canvas drawing in a page. The renderer
+All board drawing goes through `Board.attach(canvas, opts)` in
+`public/board.js` — do not hand-roll canvas drawing in a page. Feed it each
+server `state` message with `board.update(state)` and run the render loop with
+`board.start()` / `board.stop()`; the renderer buffers the two latest snapshots
+and **interpolates between them in a `requestAnimationFrame` loop**, so motion
+is smooth ~60fps even though the server only broadcasts ~10×/sec. (Draw is
+also exposed as `board.draw(state)` for one-off static frames.) The renderer
 owns the theme's board conventions:
 
 - Deep-space gradient background with a twinkling starfield.

@@ -135,7 +135,7 @@
   <script src="/confetti.js"></script>
   <script>
     let ws;
-    let sprites = [], obstacles = [], myDirs = [];
+    let myDirs = [];
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
@@ -157,6 +157,7 @@
       switch (msg.type) {
         case 'lobby':
           confetti.stop();
+          board.stop();
           document.getElementById('count').textContent = msg.count;
           document.getElementById('playerList').innerHTML =
             msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
@@ -171,18 +172,22 @@
           myDirs = msg.dirs || [];
           configurePad();
           show('game');
+          board.start();
           break;
         case 'countdown':
           showCountdown(msg.n);
+          board.start();
           break;
-        case 'state':
-          sprites = msg.sprites; obstacles = msg.obstacles;
+        case 'state': {
           const timerEl = document.getElementById('timer');
           timerEl.textContent = fmt(msg.timer);
           timerEl.classList.toggle('low', msg.timer <= 15);
-          board.draw({ sprites, obstacles });
+          board.update(msg);  // smoothly interpolated by the render loop
+          board.start();
           break;
+        }
         case 'end':
+          board.stop();
           renderEnd(msg);
           show('end');
           break;

@@ -189,7 +189,7 @@
   <script src="/board.js"></script>
   <script src="/confetti.js"></script>
   <script>
-    let sprites = [], obstacles = [], leadTeam = null;
+    let leadTeam = null;
 
     // ---- join QR code ----
     // Players join at the site root; the dashboard lives at /display. Encode the
@@ -263,6 +263,7 @@
     function handle(msg) {
       if (msg.type === 'lobby') {
         confetti.stop();
+        board.stop();
         show('finished', false);
         showView('lobby');
         const c = msg.count;
@@ -280,18 +281,20 @@
         confetti.stop();
         show('finished', false);
         showView('race');
+        board.start();
         showCountdown(msg.n);
       }
       else if (msg.type === 'state') {
         confetti.stop();
         show('finished', false);
         showView('race');
-        sprites = msg.sprites; obstacles = msg.obstacles;
         updateStats(msg);
         renderLeaderboard(msg.sprites);
-        board.draw({ sprites, obstacles, leadTeam });
+        board.update(msg);  // smoothly interpolated by the render loop
+        board.start();
       }
       else if (msg.type === 'end') {
+        board.stop();
         renderFinished(msg);
         show('finished', true);
         const wc = msg.standings && msg.standings[0] ? msg.standings[0].color : null;
@@ -299,6 +302,7 @@
       }
       else if (msg.type === 'inprogress') {
         showView('race');
+        board.start();
       }
     }
 
