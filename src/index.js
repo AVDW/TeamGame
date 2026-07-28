@@ -54,6 +54,10 @@ export default {
       const id = env.GAME.idFromName('main'); // one shared room for the office
       return env.GAME.get(id).fetch(request);
     }
+    // Clean URL for the front-of-room dashboard.
+    if ((url.pathname === '/display' || url.pathname === '/display/') && env.ASSETS) {
+      return env.ASSETS.fetch(new Request(new URL('/display.html', url), request));
+    }
     // Everything else is a static asset (index.html etc.). Assets are normally
     // served before the Worker runs; this is just a safety fallback.
     if (env.ASSETS) return env.ASSETS.fetch(request);
@@ -72,6 +76,7 @@ export class GameRoom {
     this.gameStarted = false;
     this.timer = GAME_SECONDS;
     this.nextId = 1;
+    this.inputCount = 0; // total presses this race (aggregate — no ownership)
   }
 
   async fetch(request) {
@@ -85,7 +90,7 @@ export class GameRoom {
   }
 
   onConnect(ws) {
-    const player = { ws, id: this.nextId++, name: null, team: null, dirs: [] };
+    const player = { ws, id: this.nextId++, name: null, team: null, dirs: [], spectator: false };
     this.players.set(ws, player);
     ws.addEventListener('message', (evt) => this.onMessage(player, evt.data));
     ws.addEventListener('close', () => this.onClose(player));
@@ -121,6 +126,15 @@ export class GameRoom {
       return;
     }
 
+    if (data.type === 'spectate') {
+      // The front-of-room dashboard: watches everything, never joins a team,
+      // and isn't counted as a player.
+      player.spectator = true;
+      if (this.gameStarted) this.sendState(player.ws);
+      else this.broadcastLobby();
+      return;
+    }
+
     if (data.type === 'setname') {
       player.name = String(data.name || '').slice(0, 16).trim() || null;
       if (!this.gameStarted) this.broadcastLobby();
@@ -139,6 +153,7 @@ export class GameRoom {
 
     if (data.type === 'move') {
       if (!this.gameStarted || player.team === null) return;
+      this.inputCount++; // aggregate activity counter for the dashboard
       // Only directions this player was assigned count. Enforced here so the
       // protocol never reveals which sprite a player drives — they see their
       // buttons, but have to watch the board to learn which sprite is theirs.
@@ -175,8 +190,10 @@ export class GameRoom {
   }
 
   startGame() {
-    const list = shuffle([...this.players.values()]);
+    // Spectators (the dashboard) never join a team.
+    const list = shuffle([...this.players.values()].filter((p) => !p.spectator));
     if (list.length < 1) return;
+    this.inputCount = 0;
 
     // Distribute players as evenly as possible across the chosen number of
     // teams (sizes differ by at most one).
@@ -192,6 +209,7 @@ export class GameRoom {
         name: NAMES[t % NAMES.length],
         finished: false,
         bump: 0,
+        moves: 0,
       };
       this.placeSpriteAtStart(sprite, t, teams.length);
       this.sprites.push(sprite);
@@ -298,6 +316,7 @@ export class GameRoom {
   moveSprite(team, dir) {
     const s = this.sprites[team];
     if (!s || s.finished) return;
+    s.moves++;
     if (dir === 'up') s.y -= STEP;
     else if (dir === 'down') s.y += STEP;
     else if (dir === 'left') s.x -= STEP;
@@ -420,18 +439,26 @@ export class GameRoom {
   }
 
   broadcastLobby() {
+    // Only real players count toward the lobby; spectators (the dashboard) are
+    // excluded so they don't inflate the roster or take a team slot.
+    const roster = [...this.players.values()].filter((p) => !p.spectator);
     this.broadcast({
       type: 'lobby',
-      count: this.players.size,
-      names: [...this.players.values()].map((p) => p.name || 'Player'),
+      count: roster.length,
+      names: roster.map((p) => p.name || 'Player'),
     });
   }
 
-  broadcastState() {
-    // Public board only — no ownership info of any kind.
-    this.broadcast({
+  // Build the public game state. Deliberately carries NO ownership info: no
+  // player→sprite or player→direction mapping, and no per-direction breakdown —
+  // only board-equivalent aggregates (progress, crashes, activity), so showing
+  // it on a room-wide dashboard gives no player an advantage.
+  stateMessage() {
+    return {
       type: 'state',
       timer: Math.max(0, Math.round(this.timer)),
+      inputs: this.inputCount,
+      players: [...this.players.values()].filter((p) => !p.spectator).length,
       sprites: this.sprites.map((s) => ({
         team: s.team,
         x: Math.round(s.x),
@@ -440,6 +467,8 @@ export class GameRoom {
         name: s.name,
         finished: s.finished,
         progress: this.progress(s),
+        moves: s.moves,
+        bump: s.bump,
       })),
       obstacles: this.obstacles.map((o) => ({
         x: Math.round(o.x),
@@ -448,6 +477,16 @@ export class GameRoom {
         h: o.h,
         moving: o.moving,
       })),
-    });
+    };
+  }
+
+  broadcastState() {
+    this.broadcast(this.stateMessage());
+  }
+
+  // Send a one-off snapshot to a single socket (e.g. a dashboard that connects
+  // mid-race and needs to render immediately).
+  sendState(ws) {
+    if (this.gameStarted) this.send(ws, this.stateMessage());
   }
 }
