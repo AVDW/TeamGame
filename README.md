@@ -32,13 +32,17 @@ reveal: their sprite, their direction(s), and whether they won.
 
 ## How it plays
 
-1. Everyone opens the link and enters a name.
-2. Anyone taps **Start Race**.
-3. The server auto-balances everyone into 2–4 teams; each team drives one sprite
-   and collectively controls all four directions.
-4. Race to the top before the 2-minute timer runs out. If time expires, the
-   sprite that got furthest wins.
-5. Tap **Back to lobby** to play again with fresh teams.
+1. Put the **dashboard** (`/display`) on the big screen and have everyone open
+   the link on their phone (or scan the QR) and enter a name.
+2. On the dashboard, choose the settings (race length, difficulty, teams) and
+   hit **Launch Race** — only the big screen can start the game; players can't.
+3. A **3·2·1 countdown** plays, then movement goes live. The server
+   auto-balances everyone into teams; each team drives one sprite and
+   collectively controls all four directions.
+4. Race to the top before the timer runs out. If time expires, the sprite that
+   got furthest wins.
+5. On the finished screen, hit **New Race** on the dashboard to play again with
+   fresh teams and settings.
 
 **Best with 6+ players** (two or more teams). With only a couple of people it
 still works — each becomes a solo racer controlling their whole sprite — but the
@@ -58,14 +62,18 @@ desktop; the on-screen d-pad works on touch.
 
 ## Front-of-room dashboard
 
-Open **`/display`** on a TV or projector at the front of the room. It's a
-big-screen spectator view showing:
+Open **`/display`** on a TV or projector at the front of the room. It's the
+game's control surface as well as the shared view:
 
-* a **join QR code** on the waiting screen — players scan it to open the game
-  on their phone (rendered locally from a vendored library, no external call),
-* the live race board with the current leader crowned,
-* a **standings** leaderboard (who's in the lead, progress %, and crashes),
-* an **input-activity** meter (inputs/sec, a live sparkline, and total inputs).
+* a **setup panel** to configure the next race before it starts — race length,
+  difficulty (obstacle count / trap speed / knockback), and number of teams
+  (auto or fixed) — plus the **Launch Race** button. The game can *only* be
+  started here, never from a player's phone.
+* a compact **join panel** with a QR code and URL (rendered locally from a
+  vendored library, no external call) and the count of pilots ready.
+* during a race: the live board with the current leader crowned, a **standings**
+  leaderboard (progress % and crashes), and an **input-activity** meter
+  (inputs/sec, a live sparkline, and total inputs).
 
 It connects as a spectator (`{type:'spectate'}`), so it never joins a team or
 counts as a player. Crucially it shows **only board-equivalent aggregates** —

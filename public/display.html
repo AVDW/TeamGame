@@ -28,11 +28,35 @@
 
     /* Body: board + side panel (board CSS scoped to #canvas — not the confetti overlay) */
     .body { flex: 1; display: flex; gap: 1.6vw; min-height: 0; }
+    .hidden { display: none !important; }
+    .raceview { flex: 1; display: flex; gap: 1.6vw; min-height: 0; }
     .boardWrap {
+      position: relative;
       background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
       padding: 1.4vh 1.4vh; display: flex; align-items: center; justify-content: center; min-width: 0;
     }
     #canvas { height: 100%; width: auto; max-width: 100%; border-radius: 12px; background: #070b1e; display: block; }
+
+    /* 3·2·1 countdown, centred over the board */
+    .countdown { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; }
+    .countdown.show { display: flex; }
+    .countdown .num { font-size: clamp(120px, 24vh, 340px); font-weight: 900; color: var(--accent); text-shadow: 0 0 50px rgba(76,201,240,.7); animation: pop .4s ease; }
+    .countdown .num.go { color: var(--good); text-shadow: 0 0 50px rgba(52,211,153,.7); }
+    @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+    /* Lobby / setup view */
+    .lobbyview { flex: 1; display: flex; gap: 1.6vw; min-height: 0; }
+    .joinpanel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.4vh; padding: 2vh; }
+    .joinpanel h2 { font-size: clamp(14px, 1.4vw, 24px); }
+    .setuppanel { width: 32vw; max-width: 520px; padding: 2.4vh 2vw; display: flex; flex-direction: column; }
+    .setuppanel h2 { font-size: clamp(14px, 1.4vw, 24px); margin-bottom: 2vh; }
+    .cfg { margin-bottom: 2.2vh; }
+    .cfg > label { display: block; font-size: clamp(11px, .9vw, 15px); color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; margin-bottom: .9vh; }
+    .seg { display: flex; gap: .6vw; }
+    .seg button { flex: 1; padding: 1.3vh .3vw; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-2); font-size: clamp(13px, 1.1vw, 20px); font-weight: 800; font-family: var(--font); cursor: pointer; }
+    .seg button.on { background: linear-gradient(135deg, var(--accent), #2a9fd8); color: #04121f; border-color: transparent; box-shadow: var(--glow-accent); }
+    .setuppanel .btn-primary { margin-top: auto; }
+    #startHint { margin-top: 1.2vh; }
 
     .side { width: 34vw; max-width: 560px; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; }
     .panel { padding: 1.6vh 1.3vw; }
@@ -72,11 +96,11 @@
     /* Join box: QR + URL */
     .joinbox { display: flex; align-items: center; gap: 3vw; margin: 1vh 0 1vh; flex-wrap: wrap; justify-content: center; }
     .qrframe { background: #fff; padding: 1.6vh; border-radius: var(--radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,.5), var(--glow-accent); }
-    .qrframe canvas { display: block; width: clamp(180px, 26vh, 320px); height: clamp(180px, 26vh, 320px); image-rendering: pixelated; }
+    .qrframe canvas { display: block; width: clamp(140px, 20vh, 230px); height: clamp(140px, 20vh, 230px); image-rendering: pixelated; }
     .joininfo { text-align: left; }
     .joinurl { font-family: var(--font-mono); font-size: clamp(18px, 2.2vw, 40px); font-weight: 800; color: #fff; background: var(--surface-2); border: 1px solid var(--line); padding: 1.2vh 1.6vw; border-radius: 12px; word-break: break-all; }
-    .joincount { margin-top: 2vh; display: flex; align-items: center; gap: 1.2vw; }
-    .joincount .big-num { font-size: clamp(40px, 6vw, 96px); }
+    .joincount { margin-top: 1vh; display: flex; align-items: center; gap: 1vw; justify-content: center; }
+    .joincount .big-num { font-size: clamp(30px, 4vw, 60px); }
     .podium { margin-top: 2vh; display: flex; flex-direction: column; gap: 1vh; min-width: 40vw; }
     .podium .row { border: none; background: var(--surface); border-radius: 12px; padding: 1.4vh 1.4vw; }
     .dim { color: var(--ink-3); font-size: clamp(12px, 1vw, 18px); }
@@ -94,36 +118,62 @@
     </header>
 
     <div class="body">
-      <div class="boardWrap"><canvas id="canvas" width="400" height="600"></canvas></div>
-
-      <div class="side">
-        <div class="panel board-list" style="flex:1; display:flex; flex-direction:column;">
-          <h2>Standings — who's in the lead</h2>
-          <div id="rows" style="flex:1;"></div>
+      <!-- Race view — board + live stats (during countdown and racing) -->
+      <div id="raceView" class="raceview hidden">
+        <div class="boardWrap">
+          <canvas id="canvas" width="400" height="600"></canvas>
+          <div id="countdown" class="countdown"></div>
         </div>
-        <div class="panel">
-          <h2>Input activity</h2>
-          <div class="activity">
-            <div class="apm"><div class="v" id="apm">0</div><div class="k">inputs / sec</div></div>
-            <div class="spark" id="spark"></div>
-            <div class="apm"><div class="v" id="total">0</div><div class="k">total inputs</div></div>
+        <div class="side">
+          <div class="panel board-list" style="flex:1; display:flex; flex-direction:column;">
+            <h2>Standings — who's in the lead</h2>
+            <div id="rows" style="flex:1;"></div>
+          </div>
+          <div class="panel">
+            <h2>Input activity</h2>
+            <div class="activity">
+              <div class="apm"><div class="v" id="apm">0</div><div class="k">inputs / sec</div></div>
+              <div class="spark" id="spark"></div>
+              <div class="apm"><div class="v" id="total">0</div><div class="k">total inputs</div></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Lobby / waiting overlay -->
-  <div class="overlay" id="lobby">
-    <h1>📱 <span class="title-glow">Scan to join the race</span></h1>
-    <div class="joinbox">
-      <div class="qrframe"><canvas id="qr"></canvas></div>
-      <div class="joininfo">
-        <div class="joinurl" id="joinUrl">…</div>
-        <div class="joincount"><span class="big-num" id="lobbyCount">0</span><span class="dim">pilots ready — anyone taps <b>Launch Race</b></span></div>
+      <!-- Lobby / setup view — join info + game configuration (before a race) -->
+      <div id="lobbyView" class="lobbyview">
+        <div class="panel joinpanel">
+          <h2>📱 Scan to join</h2>
+          <div class="qrframe"><canvas id="qr"></canvas></div>
+          <div class="joinurl" id="joinUrl">…</div>
+          <div class="joincount"><span class="big-num" id="lobbyCount">0</span><span class="dim">pilots ready</span></div>
+          <div class="joins" id="joins"></div>
+        </div>
+        <div class="panel setuppanel">
+          <h2>Game setup</h2>
+          <div class="cfg">
+            <label>Race length</label>
+            <div class="seg" id="segTime">
+              <button data-v="60">60s</button><button data-v="90">90s</button><button data-v="120" class="on">2 min</button><button data-v="180">3 min</button>
+            </div>
+          </div>
+          <div class="cfg">
+            <label>Difficulty</label>
+            <div class="seg" id="segDiff">
+              <button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button>
+            </div>
+          </div>
+          <div class="cfg">
+            <label>Teams</label>
+            <div class="seg" id="segTeams">
+              <button data-v="auto" class="on">Auto</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button>
+            </div>
+          </div>
+          <button class="btn-primary" id="startBtn" disabled>🚀 Launch Race</button>
+          <div class="muted" id="startHint">Waiting for pilots to join…</div>
+        </div>
       </div>
     </div>
-    <div class="joins" id="joins"></div>
   </div>
 
   <canvas id="confetti" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:80;"></canvas>
@@ -132,7 +182,7 @@
   <div class="overlay" id="finished">
     <h1 id="winBanner"></h1>
     <div class="podium" id="podium"></div>
-    <p class="dim" style="margin-top:2vh;">New race starting when the room heads back to the lobby…</p>
+    <button class="btn-primary" id="newRaceBtn" style="max-width:360px; margin-top:3vh;">🔄 New Race</button>
   </div>
 
   <script src="/qrcode.js"></script>
@@ -174,7 +224,35 @@
       ws.onclose = () => setTimeout(connect, 1500);
       ws.onmessage = (e) => handle(JSON.parse(e.data));
     }
+    function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
     function show(id, on) { document.getElementById(id).classList.toggle('show', on); }
+    function showView(name) {
+      document.getElementById('raceView').classList.toggle('hidden', name !== 'race');
+      document.getElementById('lobbyView').classList.toggle('hidden', name !== 'lobby');
+    }
+
+    // ---- game configuration (dashboard-only; sent with the start command) ----
+    const cfg = { seconds: 120, difficulty: 'normal', teams: 'auto' };
+    function wireSeg(id, key, cast) {
+      const seg = document.getElementById(id);
+      seg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+        seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        cfg[key] = cast(b.dataset.v);
+      }));
+    }
+    wireSeg('segTime', 'seconds', (v) => Number(v));
+    wireSeg('segDiff', 'difficulty', (v) => v);
+    wireSeg('segTeams', 'teams', (v) => (v === 'auto' ? 'auto' : Number(v)));
+    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', config: cfg }));
+    document.getElementById('newRaceBtn').addEventListener('click', () => send({ type: 'reset' }));
+
+    // ---- 3·2·1 countdown overlay ----
+    function showCountdown(n) {
+      const el = document.getElementById('countdown');
+      el.classList.add('show');
+      el.innerHTML = n > 0 ? `<span class="num">${n}</span>` : `<span class="num go">GO!</span>`;
+      if (n === 0) setTimeout(() => el.classList.remove('show'), 700);
+    }
 
     // ---- input-rate tracking ----
     let lastInputs = 0, lastT = 0, apmEMA = 0;
@@ -185,16 +263,29 @@
     function handle(msg) {
       if (msg.type === 'lobby') {
         confetti.stop();
-        show('lobby', true); show('finished', false);
-        document.getElementById('lobbyCount').textContent = msg.count;
-        document.getElementById('tPlayers').textContent = msg.count;
-        document.getElementById('tTeams').textContent = '0';
+        show('finished', false);
+        showView('lobby');
+        const c = msg.count;
+        document.getElementById('lobbyCount').textContent = c;
+        document.getElementById('tPlayers').textContent = c;
+        document.getElementById('tTeams').textContent = '–';
+        document.getElementById('tTime').textContent = '–';
         document.getElementById('joins').innerHTML = msg.names.map(n => `<span class="chip">${esc(n)}</span>`).join('');
+        document.getElementById('startBtn').disabled = c < 1;
+        document.getElementById('startHint').textContent =
+          c < 1 ? 'Waiting for pilots to join…' : c < 2 ? 'Add more pilots for a race — or launch a solo run.' : 'Ready when you are.';
         lastInputs = 0; apmEMA = 0;
+      }
+      else if (msg.type === 'countdown') {
+        confetti.stop();
+        show('finished', false);
+        showView('race');
+        showCountdown(msg.n);
       }
       else if (msg.type === 'state') {
         confetti.stop();
-        show('lobby', false); show('finished', false);
+        show('finished', false);
+        showView('race');
         sprites = msg.sprites; obstacles = msg.obstacles;
         updateStats(msg);
         renderLeaderboard(msg.sprites);
@@ -207,7 +298,7 @@
         confetti.launch(wc ? [wc] : null);
       }
       else if (msg.type === 'inprogress') {
-        show('lobby', false); // a race is on; state will follow
+        showView('race');
       }
     }
 
@@ -277,7 +368,7 @@
     function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
     renderJoin();
-    show('lobby', true);
+    showView('lobby');
     connect();
   </script>
 </body>
