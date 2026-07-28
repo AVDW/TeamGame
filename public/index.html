@@ -31,6 +31,13 @@
     .hint { font-size: 12px; color: var(--ink-2); }
     .hint b { color: var(--accent); }
 
+    /* 3·2·1 countdown overlay on the board */
+    .countdown { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; }
+    .countdown.show { display: flex; }
+    .countdown .num { font-size: 130px; font-weight: 900; color: var(--accent); text-shadow: 0 0 34px rgba(76,201,240,.65); animation: pop .35s ease; }
+    .countdown .num.go { font-size: 92px; color: var(--good); text-shadow: 0 0 34px rgba(52,211,153,.65); }
+    @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 45% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
     /* D-pad */
     .pad { margin: 18px auto 0; display: grid; grid-template-columns: repeat(3, 74px); grid-template-rows: repeat(3, 74px); gap: 10px; justify-content: center; }
     .pad button {
@@ -90,8 +97,7 @@
       </div>
     </div>
 
-    <button class="btn-primary" id="startBtn" disabled>Launch Race</button>
-    <div class="muted">Anyone can start once everyone's in. Teams are formed automatically — the more players, the more sprites to race.</div>
+    <div class="muted" id="waitMsg">Waiting for the host to launch the race from the big screen… 🖥️</div>
   </section>
 
   <!-- GAME -->
@@ -102,6 +108,7 @@
     </div>
     <div id="boardWrap">
       <canvas id="canvas" width="400" height="600"></canvas>
+      <div id="countdown" class="countdown"></div>
     </div>
     <div class="pad">
       <button class="up" data-dir="up">▲</button>
@@ -119,7 +126,7 @@
       <h3>Final standings</h3>
       <table id="standings"></table>
     </div>
-    <button class="btn-ghost" id="backBtn">Back to lobby</button>
+    <div class="muted">The big screen will start the next race.</div>
   </section>
 
   <canvas id="fx" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50;"></canvas>
@@ -153,7 +160,6 @@
           document.getElementById('count').textContent = msg.count;
           document.getElementById('playerList').innerHTML =
             msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
-          document.getElementById('startBtn').disabled = msg.count < 1;
           show('lobby');
           break;
         case 'inprogress':
@@ -165,6 +171,9 @@
           myDirs = msg.dirs || [];
           configurePad();
           show('game');
+          break;
+        case 'countdown':
+          showCountdown(msg.n);
           break;
         case 'state':
           sprites = msg.sprites; obstacles = msg.obstacles;
@@ -180,10 +189,17 @@
       }
     }
 
-    // --- lobby controls ---
+    // --- lobby controls (players can only set their name — the big screen
+    //     starts and controls the game) ---
     document.getElementById('name').addEventListener('input', (e) => send({ type: 'setname', name: e.target.value }));
-    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start' }));
-    document.getElementById('backBtn').addEventListener('click', () => send({ type: 'reset' }));
+
+    // --- 3·2·1 countdown overlay ---
+    function showCountdown(n) {
+      const el = document.getElementById('countdown');
+      el.classList.add('show');
+      el.innerHTML = n > 0 ? `<span class="num">${n}</span>` : `<span class="num go">GO!</span>`;
+      if (n === 0) setTimeout(() => el.classList.remove('show'), 650);
+    }
 
     // --- d-pad. Only the button(s) a player actually controls are shown, so
     //     nobody guesses their direction — they just have to find their sprite. ---

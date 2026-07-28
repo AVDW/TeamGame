@@ -24,11 +24,18 @@ const GAME_HEIGHT = 600;
 const SPRITE_SIZE = 24;
 const STEP = 20; // px moved per honoured press
 const TICK_MS = 100; // server tick
-const GAME_SECONDS = 120;
-const COLLISION_PENALTY = 2; // seconds lost when a sprite hits a trap
-const KNOCKBACK = 80; // px a sprite is bumped back down on a hit (not a full reset)
+const GAME_SECONDS = 120; // default race length; overridable per game via config
 const GRACE_TICKS = 6; // ticks of immunity after a hit (~600ms) — no chain-crashes
 const MAX_TEAMS = 4; // cap on sprites so the board stays readable
+const COUNTDOWN = 3; // seconds of "3·2·1" before a race actually begins
+
+// Difficulty presets — chosen on the dashboard before a race. Control how many
+// obstacles there are, how fast the traps move, and how punishing a hit is.
+const DIFFICULTY = {
+  easy:   { rows: 3, movers: 2, speed: 2, knockback: 60,  penalty: 1 },
+  normal: { rows: 4, movers: 4, speed: 3, knockback: 80,  penalty: 2 },
+  hard:   { rows: 5, movers: 6, speed: 4, knockback: 100, penalty: 3 },
+};
 const START_MARGIN = 12;
 const START_Y = GAME_HEIGHT - SPRITE_SIZE - START_MARGIN;
 
@@ -78,9 +85,18 @@ export class GameRoom {
     this.sprites = [];
     this.obstacles = [];
     this.gameStarted = false;
+    this.counting = false; // true during the 3·2·1 countdown before a race
+    this.countdownLeft = 0;
     this.timer = GAME_SECONDS;
     this.nextId = 1;
     this.inputCount = 0; // total presses this race (aggregate — no ownership)
+    this.config = { seconds: GAME_SECONDS, difficulty: 'normal', teams: 'auto' };
+    this.diff = DIFFICULTY.normal;
+  }
+
+  // The room is "in the lobby" only when neither counting down nor racing.
+  inLobby() {
+    return !this.gameStarted && !this.counting;
   }
 
   async fetch(request) {
@@ -100,8 +116,8 @@ export class GameRoom {
     ws.addEventListener('close', () => this.onClose(player));
     ws.addEventListener('error', () => this.onClose(player));
 
-    if (this.gameStarted) {
-      // Late joiner watches this round, joins the next one.
+    if (!this.inLobby()) {
+      // Late joiner (during countdown or a race) watches, joins the next one.
       this.send(ws, { type: 'inprogress' });
     } else {
       this.broadcastLobby();
@@ -114,10 +130,11 @@ export class GameRoom {
       // Everyone left — fully reset so the room doesn't wedge in a started
       // state and refuse the next group of players.
       this.gameStarted = false;
+      this.counting = false;
       this.sprites = [];
       this.obstacles = [];
       this.stopTick();
-    } else if (!this.gameStarted) {
+    } else if (this.inLobby()) {
       this.broadcastLobby();
     }
   }
@@ -134,24 +151,27 @@ export class GameRoom {
       // The front-of-room dashboard: watches everything, never joins a team,
       // and isn't counted as a player.
       player.spectator = true;
-      if (this.gameStarted) this.sendState(player.ws);
-      else this.broadcastLobby();
+      if (this.inLobby()) this.broadcastLobby();
+      else this.sendState(player.ws); // mid-countdown/race: show the board, not the lobby
       return;
     }
 
     if (data.type === 'setname') {
       player.name = String(data.name || '').slice(0, 16).trim() || null;
-      if (!this.gameStarted) this.broadcastLobby();
+      if (this.inLobby()) this.broadcastLobby();
       return;
     }
 
     if (data.type === 'start') {
-      if (!this.gameStarted) this.startGame();
+      // Only the dashboard (a spectator) can start a race, and only from the
+      // lobby. Players cannot start the game.
+      if (player.spectator && this.inLobby()) this.startGame(data.config);
       return;
     }
 
     if (data.type === 'reset') {
-      this.endToLobby();
+      // Only the dashboard controls returning the room to the lobby.
+      if (player.spectator) this.endToLobby();
       return;
     }
 
@@ -193,15 +213,29 @@ export class GameRoom {
     members.forEach((m, i) => (m.dirs = buckets[i]));
   }
 
-  startGame() {
+  // Validate and store the dashboard's chosen settings for this race.
+  applyConfig(config) {
+    config = config || {};
+    const seconds = Math.max(30, Math.min(300, Math.round(Number(config.seconds) || GAME_SECONDS)));
+    const difficulty = DIFFICULTY[config.difficulty] ? config.difficulty : 'normal';
+    const teamsNum = Number(config.teams);
+    const teams = [2, 3, 4].includes(teamsNum) ? teamsNum : 'auto';
+    this.config = { seconds, difficulty, teams };
+    this.diff = DIFFICULTY[difficulty];
+  }
+
+  startGame(config) {
     // Spectators (the dashboard) never join a team.
     const list = shuffle([...this.players.values()].filter((p) => !p.spectator));
     if (list.length < 1) return;
+    this.applyConfig(config);
     this.inputCount = 0;
 
-    // Distribute players as evenly as possible across the chosen number of
-    // teams (sizes differ by at most one).
-    const count = this.teamCount(list.length);
+    // Number of teams: honour a fixed choice, else auto-balance. Never more
+    // teams than players.
+    const count = this.config.teams === 'auto'
+      ? this.teamCount(list.length)
+      : Math.min(this.config.teams, list.length);
     const teams = Array.from({ length: count }, () => []);
     list.forEach((p, i) => teams[i % count].push(p));
 
@@ -224,20 +258,41 @@ export class GameRoom {
     });
 
     this.buildObstacles();
-    this.timer = GAME_SECONDS;
-    this.gameStarted = true;
+    this.timer = this.config.seconds;
 
     // Tell each player which button(s) they control — but still NOT which
-    // sprite is theirs.
+    // sprite is theirs. Then run a 3·2·1 countdown before movement is live.
     for (const p of this.players.values()) {
       this.send(p.ws, { type: 'start', dirs: p.dirs });
     }
-    this.scheduleTick();
-    this.broadcastState();
+    this.counting = true;
+    this.gameStarted = false;
+    this.countdownLeft = COUNTDOWN;
+    this.broadcast({ type: 'countdown', n: COUNTDOWN });
+    this.broadcastState(); // board renders with sprites at the start line
+    this.state.storage.setAlarm(Date.now() + 1000).catch(() => {});
+  }
+
+  // Fires once per second during the pre-race countdown, then kicks off the
+  // race when it reaches zero.
+  tickCountdown() {
+    this.countdownLeft -= 1;
+    if (this.countdownLeft > 0) {
+      this.broadcast({ type: 'countdown', n: this.countdownLeft });
+      this.state.storage.setAlarm(Date.now() + 1000).catch(() => {});
+    } else {
+      this.counting = false;
+      this.gameStarted = true;
+      this.timer = this.config.seconds;
+      this.broadcast({ type: 'countdown', n: 0 }); // GO!
+      this.broadcastState();
+      this.state.storage.setAlarm(Date.now() + TICK_MS).catch(() => {});
+    }
   }
 
   endGame(winner) {
     this.gameStarted = false;
+    this.counting = false;
     this.stopTick();
 
     const standings = this.sprites
@@ -270,6 +325,7 @@ export class GameRoom {
 
   endToLobby() {
     this.gameStarted = false;
+    this.counting = false;
     this.stopTick();
     this.sprites = [];
     this.obstacles = [];
@@ -288,28 +344,30 @@ export class GameRoom {
   }
 
   buildObstacles() {
+    const { rows, movers, speed } = this.diff;
     this.obstacles = [];
-    // Static blocks in a few rows to weave through.
-    for (let row = 0; row < 4; row++) {
-      const y = 90 + row * 100 + rand(-15, 15);
+    // Static blocks spread across the height of the course to weave through.
+    const gap = (GAME_HEIGHT - 180) / rows;
+    for (let row = 0; row < rows; row++) {
+      const y = 90 + row * gap + rand(-15, 15);
       const count = 1 + Math.floor(rand(0, 2)); // 1-2 per row
       for (let c = 0; c < count; c++) {
         const w = 40 + rand(0, 40);
         this.obstacles.push({ x: rand(0, GAME_WIDTH - w), y, w, h: 24, moving: false });
       }
     }
-    // Patrolling traps that slide left/right — four of them, spread up the
-    // course (including one guarding the approach to the finish) at varied
-    // speeds for a livelier board.
-    for (let i = 0; i < 4; i++) {
+    // Patrolling traps that slide left/right, spread up the course (including
+    // one guarding the approach to the finish) at difficulty-scaled speeds.
+    const mgap = (GAME_HEIGHT - 160) / movers;
+    for (let i = 0; i < movers; i++) {
       const w = 36;
       this.obstacles.push({
         x: rand(0, GAME_WIDTH - w),
-        y: 90 + i * 110 + rand(-18, 18),
+        y: 90 + i * mgap + rand(-18, 18),
         w,
         h: 24,
         moving: true,
-        vx: (rand(0, 1) < 0.5 ? -1 : 1) * (2 + rand(0, 4)), // px per tick
+        vx: (rand(0, 1) < 0.5 ? -1 : 1) * (speed + rand(0, speed)), // px per tick
       });
     }
   }
@@ -338,8 +396,8 @@ export class GameRoom {
     if (sprite.grace > 0) return; // still recovering from the last hit
     // Knock back down a chunk (never below the start) instead of a full reset,
     // and clear the obstacle so we don't immediately re-collide.
-    sprite.y = Math.min(START_Y, sprite.y + KNOCKBACK);
-    this.timer = Math.max(0, this.timer - COLLISION_PENALTY);
+    sprite.y = Math.min(START_Y, sprite.y + this.diff.knockback);
+    this.timer = Math.max(0, this.timer - this.diff.penalty);
     sprite.bump++;
     sprite.grace = GRACE_TICKS;
   }
@@ -383,6 +441,10 @@ export class GameRoom {
   }
 
   async alarm() {
+    if (this.counting) {
+      this.tickCountdown();
+      return;
+    }
     if (!this.gameStarted) return;
     this.gameTick();
     if (this.gameStarted) await this.state.storage.setAlarm(Date.now() + TICK_MS);
