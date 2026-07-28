@@ -18,7 +18,11 @@ the top.
   teams, so it's always a race whatever the headcount (more players → more
   sprites).
 * **Moving traps** — red obstacles patrol left and right; grey ones sit still.
-  Hit any of them and your sprite is sent back to the start with a time penalty.
+  Hit any of them and your sprite is knocked back down a bit (not a full reset)
+  with a small time penalty, plus a brief moment of immunity so you don't
+  chain-crash on the same trap.
+* **Winner celebration** — the dashboard (and each winning player's phone) rains
+  confetti when a race is won.
 * **Every press moves it** — any teammate's valid press nudges the sprite
   immediately, so a teammate pushing the wrong way is part of the fun.
 

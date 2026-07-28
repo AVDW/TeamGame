@@ -25,7 +25,9 @@ const SPRITE_SIZE = 24;
 const STEP = 20; // px moved per honoured press
 const TICK_MS = 100; // server tick
 const GAME_SECONDS = 120;
-const COLLISION_PENALTY = 3; // seconds lost when a sprite hits a trap
+const COLLISION_PENALTY = 2; // seconds lost when a sprite hits a trap
+const KNOCKBACK = 80; // px a sprite is bumped back down on a hit (not a full reset)
+const GRACE_TICKS = 6; // ticks of immunity after a hit (~600ms) — no chain-crashes
 const MAX_TEAMS = 4; // cap on sprites so the board stays readable
 const START_MARGIN = 12;
 const START_Y = GAME_HEIGHT - SPRITE_SIZE - START_MARGIN;
@@ -210,6 +212,7 @@ export class GameRoom {
         finished: false,
         bump: 0,
         moves: 0,
+        grace: 0,
       };
       this.placeSpriteAtStart(sprite, t, teams.length);
       this.sprites.push(sprite);
@@ -282,11 +285,6 @@ export class GameRoom {
     sprite.startX = sprite.x;
   }
 
-  resetSprite(sprite) {
-    sprite.x = sprite.startX;
-    sprite.y = START_Y;
-  }
-
   buildObstacles() {
     this.obstacles = [];
     // Static blocks in a few rows to weave through.
@@ -298,16 +296,18 @@ export class GameRoom {
         this.obstacles.push({ x: rand(0, GAME_WIDTH - w), y, w, h: 24, moving: false });
       }
     }
-    // Patrolling traps that slide left/right.
-    for (let i = 0; i < 3; i++) {
+    // Patrolling traps that slide left/right — four of them, spread up the
+    // course (including one guarding the approach to the finish) at varied
+    // speeds for a livelier board.
+    for (let i = 0; i < 4; i++) {
       const w = 36;
       this.obstacles.push({
         x: rand(0, GAME_WIDTH - w),
-        y: 120 + i * 130 + rand(-20, 20),
+        y: 90 + i * 110 + rand(-18, 18),
         w,
         h: 24,
         moving: true,
-        vx: (rand(0, 1) < 0.5 ? -1 : 1) * (2 + rand(0, 3)), // px per tick
+        vx: (rand(0, 1) < 0.5 ? -1 : 1) * (2 + rand(0, 4)), // px per tick
       });
     }
   }
@@ -333,9 +333,13 @@ export class GameRoom {
   }
 
   bump(sprite) {
-    this.resetSprite(sprite);
+    if (sprite.grace > 0) return; // still recovering from the last hit
+    // Knock back down a chunk (never below the start) instead of a full reset,
+    // and clear the obstacle so we don't immediately re-collide.
+    sprite.y = Math.min(START_Y, sprite.y + KNOCKBACK);
     this.timer = Math.max(0, this.timer - COLLISION_PENALTY);
     sprite.bump++;
+    sprite.grace = GRACE_TICKS;
   }
 
   hitsObstacle(s) {
@@ -402,7 +406,8 @@ export class GameRoom {
     // A moving trap can run into a sprite; and check for a winner.
     for (const s of this.sprites) {
       if (s.finished) continue;
-      if (this.hitsObstacle(s)) this.bump(s);
+      if (s.grace > 0) s.grace--;
+      else if (this.hitsObstacle(s)) this.bump(s);
       if (s.y <= 0) {
         s.finished = true;
         this.endGame(s.team);
@@ -469,6 +474,7 @@ export class GameRoom {
         progress: this.progress(s),
         moves: s.moves,
         bump: s.bump,
+        grace: s.grace > 0, // just got knocked — clients flash it
       })),
       obstacles: this.obstacles.map((o) => ({
         x: Math.round(o.x),

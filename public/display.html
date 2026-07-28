@@ -48,7 +48,7 @@
       background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
       padding: 1.4vh 1.4vh; display: flex; align-items: center; justify-content: center; min-width: 0;
     }
-    canvas { height: 100%; width: auto; max-width: 100%; border-radius: 12px; background: #eef2f7; display: block; }
+    #canvas { height: 100%; width: auto; max-width: 100%; border-radius: 12px; background: #eef2f7; display: block; }
 
     .side { width: 34vw; max-width: 560px; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; }
     .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.6vh 1.3vw; }
@@ -143,6 +143,8 @@
     <div class="joins" id="joins"></div>
   </div>
 
+  <canvas id="confetti" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:80;"></canvas>
+
   <!-- Finished overlay -->
   <div class="overlay" id="finished">
     <h1 id="winBanner"></h1>
@@ -198,6 +200,7 @@
 
     function handle(msg) {
       if (msg.type === 'lobby') {
+        stopConfetti();
         show('lobby', true); show('finished', false);
         document.getElementById('lobbyCount').textContent = msg.count;
         document.getElementById('tPlayers').textContent = msg.count;
@@ -206,6 +209,7 @@
         lastInputs = 0; apmEMA = 0;
       }
       else if (msg.type === 'state') {
+        if (confRAF) stopConfetti();
         show('lobby', false); show('finished', false);
         sprites = msg.sprites; obstacles = msg.obstacles;
         updateStats(msg);
@@ -215,6 +219,8 @@
       else if (msg.type === 'end') {
         renderFinished(msg);
         show('finished', true);
+        const wc = msg.standings && msg.standings[0] ? msg.standings[0].color : null;
+        launchConfetti(wc ? [wc, '#fbbf24', '#ffffff', '#38bdf8', '#22c55e'] : null);
       }
       else if (msg.type === 'inprogress') {
         show('lobby', false); // a race is on; state will follow
@@ -291,7 +297,7 @@
       for (const o of obstacles) { ctx.fillStyle = o.moving ? '#ef4444' : '#64748b'; rr(o.x, o.y, o.w, o.h, 5); ctx.fill(); }
       // sprites
       for (const s of sprites) {
-        ctx.fillStyle = s.color; rr(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
+        ctx.fillStyle = s.grace ? '#fca5a5' : s.color; rr(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.fillRect(s.x + 5, s.y + 7, 4, 4); ctx.fillRect(s.x + SPRITE_SIZE - 9, s.y + 7, 4, 4);
         if (s.team === leadTeam && !s.finished) { ctx.font = '16px sans-serif'; ctx.fillText('👑', s.x + 3, s.y - 4); }
         if (s.finished) { ctx.font = 'bold 15px sans-serif'; ctx.fillText('🏁', s.x + 3, s.y + 18); }
@@ -304,6 +310,41 @@
     }
 
     function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+    // ---- confetti celebration ----
+    const conf = document.getElementById('confetti'), cfx = conf.getContext('2d');
+    let confParts = [], confUntil = 0, confRAF = null;
+    let confColors = ['#fbbf24', '#38bdf8', '#22c55e', '#ef4444', '#f59e0b', '#a855f7'];
+    function sizeConf() { conf.width = innerWidth; conf.height = innerHeight; }
+    function newPart() {
+      return { x: Math.random() * conf.width, y: -20 - Math.random() * 300,
+        vx: (Math.random() - 0.5) * 3, vy: 4 + Math.random() * 5, s: 6 + Math.random() * 9,
+        c: confColors[Math.floor(Math.random() * confColors.length)], r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3 };
+    }
+    function launchConfetti(colors) {
+      if (colors && colors.length) confColors = colors;
+      sizeConf();
+      confParts = Array.from({ length: 240 }, newPart);
+      confUntil = performance.now() + 6500;
+      if (!confRAF) confRAF = requestAnimationFrame(confTick);
+    }
+    function stopConfetti() {
+      confUntil = 0; confParts = [];
+      if (confRAF) { cancelAnimationFrame(confRAF); confRAF = null; }
+      cfx.clearRect(0, 0, conf.width, conf.height);
+    }
+    function confTick(now) {
+      cfx.clearRect(0, 0, conf.width, conf.height);
+      for (const p of confParts) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.r += p.vr;
+        if (p.y > conf.height + 20 && now < confUntil) { Object.assign(p, newPart()); p.y = -20; }
+        cfx.save(); cfx.translate(p.x, p.y); cfx.rotate(p.r); cfx.fillStyle = p.c;
+        cfx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); cfx.restore();
+      }
+      if (now < confUntil || confParts.some(p => p.y < conf.height + 20)) confRAF = requestAnimationFrame(confTick);
+      else { confRAF = null; cfx.clearRect(0, 0, conf.width, conf.height); }
+    }
+    addEventListener('resize', () => { if (confRAF) sizeConf(); });
 
     renderJoin();
     show('lobby', true);
