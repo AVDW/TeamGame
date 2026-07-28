@@ -66,6 +66,8 @@
     .reveal { text-align: center; font-size: 15px; line-height: 1.5; }
     table { width: 100%; border-collapse: collapse; margin-top: 6px; }
     td { padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    /* mini-sprite icon: team colour + its shape marker, mirroring the board */
+    .mini { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; font-size: 14px; font-weight: 900; line-height: 1; vertical-align: middle; text-shadow: 0 1px 1px rgba(4,8,20,.85); }
   </style>
 </head>
 <body>
@@ -256,7 +258,7 @@
         const plural = (msg.yourDirs || []).length > 1;
         reveal.innerHTML =
           `You were on the <b>${escapeHtml(msg.yourSpriteName)}</b> team` +
-          `<span class="swatch" style="background:${msg.yourColor}; color:${msg.yourColor}"></span><br>` +
+          `<span class="mini" style="background:${msg.yourColor}">${Board.MARKERS[msg.yourTeam % Board.MARKERS.length]}</span><br>` +
           `Your control${plural ? 's were' : ' was'} <b>${dirs}</b>.` +
           `<div class="muted">Did you spot your sprite in time?</div>`;
       } else {
@@ -266,7 +268,7 @@
       document.getElementById('standings').innerHTML = msg.standings.map((s, i) => `
         <tr>
           <td style="width:24px;color:var(--ink-3);">${i + 1}</td>
-          <td><span class="swatch" style="background:${s.color}; color:${s.color}"></span> ${escapeHtml(s.name)}</td>
+          <td><span class="mini" style="background:${s.color}">${Board.MARKERS[s.team % Board.MARKERS.length]}</span> ${escapeHtml(s.name)}</td>
           <td style="text-align:right;">${s.finished ? '🏁 finished' : Math.round(s.progress * 100) + '%'}</td>
           <td style="text-align:right;color:var(--ink-3);">${s.bump} bumps</td>
         </tr>`).join('');

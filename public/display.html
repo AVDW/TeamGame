@@ -76,6 +76,8 @@
     .who { min-width: 0; }
     .name { display: flex; align-items: center; gap: .6vw; font-size: clamp(15px, 1.5vw, 27px); font-weight: 800; }
     .name .swatch { width: 1.4vw; height: 1.4vw; min-width: 14px; min-height: 14px; border-radius: 5px; }
+    /* mini-sprite icon: team colour + its shape marker, mirroring the board */
+    .mini { display: inline-flex; align-items: center; justify-content: center; width: 1.9vw; height: 1.9vw; min-width: 24px; min-height: 24px; border-radius: 6px; color: #fff; font-size: clamp(12px, 1.1vw, 19px); font-weight: 900; line-height: 1; text-shadow: 0 1px 1px rgba(4,8,20,.85); }
     .bar { margin-top: .7vh; height: 1.2vh; min-height: 9px; }
     .meta { text-align: right; white-space: nowrap; }
     .pct { font-size: clamp(15px, 1.5vw, 27px); font-weight: 900; font-variant-numeric: tabular-nums; }
@@ -361,7 +363,7 @@
         <div class="row ${i === 0 ? 'lead' : ''}">
           <div class="rank">${i === 0 ? '👑' : (i + 1)}</div>
           <div class="who">
-            <div class="name"><span class="swatch" style="background:${s.color}; color:${s.color}"></span>${esc(s.name)}</div>
+            <div class="name"><span class="mini" style="background:${s.color}">${Board.MARKERS[s.team % Board.MARKERS.length]}</span>${esc(s.name)}</div>
             <div class="bar"><span style="width:${Math.round(s.progress*100)}%; background:${s.color}"></span></div>
           </div>
           <div class="meta">
@@ -378,7 +380,7 @@
       document.getElementById('podium').innerHTML = st.map((s, i) => `
         <div class="row">
           <div class="rank">${['🥇','🥈','🥉'][i] || (i+1)}</div>
-          <div class="who"><div class="name"><span class="swatch" style="background:${s.color}; color:${s.color}"></span>${esc(s.name)}</div></div>
+          <div class="who"><div class="name"><span class="mini" style="background:${s.color}">${Board.MARKERS[s.team % Board.MARKERS.length]}</span>${esc(s.name)}</div></div>
           <div class="meta"><div class="pct">${s.finished ? '🏁' : Math.round(s.progress*100)+'%'}</div><div class="crash">${s.bump} crashes</div></div>
         </div>`).join('');
     }

@@ -22,6 +22,12 @@ const Board = (() => {
   const TRAIL_LEN = 8;
   const TRAIL_MS = 45; // record a trail point at most this often (time-based, not per-frame)
 
+  // A distinct shape per team, drawn on the sprite AND shown in the leaderboard
+  // /reveal, so sprites are identified by shape + colour + name — never colour
+  // alone (colourblind-friendly, and easier for everyone to track their sprite).
+  // The first four (only ones used at MAX_TEAMS=4) are maximally distinct.
+  const MARKERS = ['●', '▲', '■', '◆', '★', '✚', '✦', '⬢'];
+
   function makeStars() {
     const stars = [];
     for (let i = 0; i < 90; i++) {
@@ -186,10 +192,16 @@ const Board = (() => {
         ctx.fillStyle = flashing ? '#fca5a5' : s.color;
         roundRect(ctx, s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
 
-        // eyes for a bit of character
+        // shape marker (with a dark outline so it reads on any team colour)
+        const mk = MARKERS[s.team % MARKERS.length];
+        ctx.save();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = 'bold 15px system-ui, "Segoe UI Symbol", sans-serif';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(4,8,20,0.85)';
+        ctx.strokeText(mk, s.x + SPRITE_SIZE / 2, s.y + SPRITE_SIZE / 2 + 0.5);
         ctx.fillStyle = '#fff';
-        ctx.fillRect(s.x + 5, s.y + 7, 4, 4);
-        ctx.fillRect(s.x + SPRITE_SIZE - 9, s.y + 7, 4, 4);
+        ctx.fillText(mk, s.x + SPRITE_SIZE / 2, s.y + SPRITE_SIZE / 2 + 0.5);
+        ctx.restore();
 
         if (opts.showLead && s.team === leadTeam && !s.finished) {
           ctx.font = '16px sans-serif';
@@ -210,5 +222,5 @@ const Board = (() => {
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
   }
 
-  return { attach, GAME_W, GAME_H };
+  return { attach, GAME_W, GAME_H, MARKERS };
 })();
