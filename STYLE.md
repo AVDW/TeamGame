@@ -92,9 +92,13 @@ owns the theme's board conventions:
 - The finish line is a **glowing cyan goal gate** at the top.
 - Moving obstacles: dark rounded rects with rose warning stripes. Static
   obstacles: grey rocks with a subtle top highlight.
-- Sprites: rounded squares in their team colour, white eyes, a fading
+- Sprites: rounded squares in their team colour, each stamped with a distinct
+  white **shape marker** (`Board.MARKERS[team]`) so teams are told apart by
+  shape + colour + name — never colour alone (colourblind-friendly). A fading
   **thruster trail** of recent positions, a red flash when bumped back, 🏁 when
-  finished, 👑 on the leader (dashboard only, `opts.showLead`).
+  finished, 👑 on the leader (dashboard only, `opts.showLead`). Show the same
+  marker on a colour-filled `.mini` chip anywhere a sprite is named (leaderboard,
+  standings, reveal) so it mirrors the board.
 
 Canvas `shadowBlur` glows were removed for mobile performance (they were the
 dominant per-frame cost) — keep flat fills and gradients; do not reintroduce
