@@ -24,7 +24,9 @@ the top.
 * **Winner celebration** — the dashboard (and each winning player's phone) rains
   confetti when a race is won.
 * **Every press moves it** — any teammate's valid press nudges the sprite
-  immediately, so a teammate pushing the wrong way is part of the fun.
+  immediately, so a teammate pushing the wrong way is part of the fun. Each
+  player's moves are rate-limited (~14/sec) so races are won by coordination,
+  not by tapping fast or scripting.
 
 Watch which sprite your button moves, then coordinate with your team to weave to
 the top. First team to the top wins. At the end, each player gets a personal
@@ -105,5 +107,6 @@ After deploy, share the `*.workers.dev` URL with the office.
 
 The client protocol is deliberately thin: the phone sends every button press as
 `{type:'move', dir}`, and the server decides whether that press matches the
-player's secret direction. Board state broadcasts carry **no** ownership info,
-so the hidden-controls mechanic can't be reverse-engineered from network traffic.
+player's secret direction and isn't coming in faster than the per-player rate
+limit. Board state broadcasts carry **no** ownership info, so the hidden-controls
+mechanic can't be reverse-engineered from network traffic.

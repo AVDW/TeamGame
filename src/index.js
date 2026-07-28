@@ -28,6 +28,8 @@ const GAME_SECONDS = 120; // default race length; overridable per game via confi
 const GRACE_TICKS = 6; // ticks of immunity after a hit (~600ms) — no chain-crashes
 const MAX_TEAMS = 4; // cap on sprites so the board stays readable
 const COUNTDOWN = 3; // seconds of "3·2·1" before a race actually begins
+const MOVE_COOLDOWN_MS = 70; // min gap between a player's honoured moves (~14/s)
+                             // so races are won by coordination, not tap speed
 
 // Difficulty presets — chosen on the dashboard before a race. Control how many
 // obstacles there are, how fast the traps move, and how punishing a hit is.
@@ -110,7 +112,7 @@ export class GameRoom {
   }
 
   onConnect(ws) {
-    const player = { ws, id: this.nextId++, name: null, team: null, dirs: [], spectator: false };
+    const player = { ws, id: this.nextId++, name: null, team: null, dirs: [], spectator: false, lastMove: 0 };
     this.players.set(ws, player);
     ws.addEventListener('message', (evt) => this.onMessage(player, evt.data));
     ws.addEventListener('close', () => this.onClose(player));
@@ -182,6 +184,11 @@ export class GameRoom {
       // protocol never reveals which sprite a player drives — they see their
       // buttons, but have to watch the board to learn which sprite is theirs.
       if (!player.dirs.includes(data.dir)) return;
+      // Rate-limit each player's honoured moves so a fast tapper (or a script)
+      // can't out-move everyone else — coordination should win, not tap speed.
+      const now = Date.now();
+      if (now - player.lastMove < MOVE_COOLDOWN_MS) return;
+      player.lastMove = now;
       this.moveSprite(player.team, data.dir);
       return;
     }
