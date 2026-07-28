@@ -100,16 +100,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <h3>Team size</h3>
-      <div class="seg" id="teamSize">
-        <button data-size="3">3 per team</button>
-        <button data-size="4" class="on">4 per team</button>
-      </div>
-    </div>
-
     <button class="primary" id="startBtn" disabled>Start Race</button>
-    <div class="muted">Anyone can start once everyone's in.</div>
+    <div class="muted">Anyone can start once everyone's in. Teams are formed automatically — the more players, the more sprites to race.</div>
   </section>
 
   <!-- GAME -->
@@ -142,7 +134,7 @@
 
   <script>
     const SPRITE_SIZE = 24;
-    let ws, teamSize = 4;
+    let ws;
     let sprites = [], obstacles = [], lastProgress = {}, myDirs = [];
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
@@ -194,13 +186,7 @@
 
     // --- lobby controls ---
     document.getElementById('name').addEventListener('input', (e) => send({ type: 'setname', name: e.target.value }));
-    document.querySelectorAll('#teamSize button').forEach(b => {
-      b.addEventListener('click', () => {
-        teamSize = +b.dataset.size;
-        document.querySelectorAll('#teamSize button').forEach(x => x.classList.toggle('on', x === b));
-      });
-    });
-    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', teamSize }));
+    document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start' }));
     document.getElementById('backBtn').addEventListener('click', () => send({ type: 'reset' }));
 
     // --- d-pad. Only the button(s) a player actually controls are shown, so
@@ -281,14 +267,15 @@
       else if (msg.winnerName) { banner.textContent = `${msg.winnerName} team wins`; banner.style.color = '#e2e8f0'; }
       else { banner.textContent = "Time's up!"; banner.style.color = '#e2e8f0'; }
 
-      const dirWord = { up: 'UP ▲', down: 'DOWN ▼', left: 'LEFT ◀', right: 'RIGHT ▶' };
       const reveal = document.getElementById('reveal');
       if (msg.yourTeam !== null && msg.yourColor) {
+        const dirs = (msg.yourDirs || []).map(d => DIR_LABEL[d] || d).join(' & ');
+        const plural = (msg.yourDirs || []).length > 1;
         reveal.innerHTML =
           `You were on the <b>${escapeHtml(msg.yourSpriteName)}</b> team` +
           `<span class="swatch" style="background:${msg.yourColor}"></span><br>` +
-          `Your secret control was <b>${dirWord[msg.yourDir] || msg.yourDir}</b>.` +
-          `<div class="muted">Did you figure it out in time?</div>`;
+          `Your control${plural ? 's were' : ' was'} <b>${dirs}</b>.` +
+          `<div class="muted">Did you spot your sprite in time?</div>`;
       } else {
         reveal.innerHTML = `You were spectating this round — you'll be dealt in next time.`;
       }
