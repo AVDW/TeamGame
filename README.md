@@ -57,6 +57,8 @@ desktop; the on-screen d-pad works on touch.
 Open **`/display`** on a TV or projector at the front of the room. It's a
 big-screen spectator view showing:
 
+* a **join QR code** on the waiting screen — players scan it to open the game
+  on their phone (rendered locally from a vendored library, no external call),
 * the live race board with the current leader crowned,
 * a **standings** leaderboard (who's in the lead, progress %, and crashes),
 * an **input-activity** meter (inputs/sec, a live sparkline, and total inputs).

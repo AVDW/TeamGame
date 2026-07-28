@@ -86,6 +86,14 @@
     .joins { margin-top: 3vh; display: flex; flex-wrap: wrap; gap: .8vw; justify-content: center; max-width: 80vw; }
     .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: .7vh 1.1vw; font-size: clamp(13px, 1.2vw, 22px); font-weight: 700; }
     .big-num { font-size: clamp(48px, 9vw, 150px); font-weight: 900; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+    /* Join box: QR + URL */
+    .joinbox { display: flex; align-items: center; gap: 3vw; margin: 1vh 0 1vh; flex-wrap: wrap; justify-content: center; }
+    .qrframe { background: #fff; padding: 1.6vh; border-radius: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+    .qrframe canvas { display: block; width: clamp(180px, 26vh, 320px); height: clamp(180px, 26vh, 320px); image-rendering: pixelated; }
+    .joininfo { text-align: left; }
+    .joinurl { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: clamp(18px, 2.2vw, 40px); font-weight: 800; color: #fff; background: var(--surface-2); border: 1px solid var(--line); padding: 1.2vh 1.6vw; border-radius: 12px; word-break: break-all; }
+    .joincount { margin-top: 2vh; display: flex; align-items: center; gap: 1.2vw; }
+    .joincount .big-num { font-size: clamp(40px, 6vw, 96px); }
     .podium { margin-top: 2vh; display: flex; flex-direction: column; gap: 1vh; min-width: 40vw; }
     .podium .row { border: none; background: var(--surface); border-radius: 12px; padding: 1.4vh 1.4vw; }
     .dim { color: var(--ink-3); font-size: clamp(12px, 1vw, 18px); }
@@ -124,9 +132,14 @@
 
   <!-- Lobby / waiting overlay -->
   <div class="overlay" id="lobby">
-    <h1>Waiting for players…</h1>
-    <div class="big-num" id="lobbyCount">0</div>
-    <p>Open this on your phone to join, then anyone taps <b>Start Race</b>.</p>
+    <h1>📱 Scan to join the race</h1>
+    <div class="joinbox">
+      <div class="qrframe"><canvas id="qr"></canvas></div>
+      <div class="joininfo">
+        <div class="joinurl" id="joinUrl">…</div>
+        <div class="joincount"><span class="big-num" id="lobbyCount">0</span><span class="dim">players ready — anyone taps <b>Start Race</b></span></div>
+      </div>
+    </div>
     <div class="joins" id="joins"></div>
   </div>
 
@@ -137,9 +150,34 @@
     <p class="dim" style="margin-top:2vh;">New race starting when the room heads back to the lobby…</p>
   </div>
 
+  <script src="/qrcode.js"></script>
   <script>
     const SPRITE_SIZE = 24, GAME_W = 400, GAME_H = 600;
     let sprites = [], obstacles = [], leadTeam = null;
+
+    // ---- join QR code ----
+    // Players join at the site root; the dashboard lives at /display. Encode the
+    // root URL so a phone scan opens the game directly. Rendered locally from a
+    // vendored library — no external service.
+    function renderJoin() {
+      const joinUrl = location.origin + '/';
+      document.getElementById('joinUrl').textContent = location.host + '/';
+      try {
+        const qr = qrcode(0, 'M');       // type 0 = auto-size, medium error correction
+        qr.addData(joinUrl);
+        qr.make();
+        const n = qr.getModuleCount(), margin = 4, scale = 8;
+        const px = (n + margin * 2) * scale;
+        const cv = document.getElementById('qr');
+        cv.width = cv.height = px;
+        const c = cv.getContext('2d');
+        c.fillStyle = '#ffffff'; c.fillRect(0, 0, px, px);
+        c.fillStyle = '#0b1220';
+        for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+          if (qr.isDark(r, col)) c.fillRect((col + margin) * scale, (r + margin) * scale, scale, scale);
+        }
+      } catch (e) { /* qrcode lib missing — the URL text is still shown */ }
+    }
 
     // ---- websocket (spectator) ----
     let ws;
@@ -267,6 +305,7 @@
 
     function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+    renderJoin();
     show('lobby', true);
     connect();
   </script>
