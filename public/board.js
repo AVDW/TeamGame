@@ -131,8 +131,6 @@ const Board = (() => {
       ctx.fillRect(0, 0, GAME_W, FINISH_H + 14);
       ctx.save();
       ctx.strokeStyle = 'rgba(76,201,240,0.8)';
-      ctx.shadowColor = '#4cc9f0';
-      ctx.shadowBlur = 8;
       ctx.setLineDash([8, 6]);
       ctx.beginPath(); ctx.moveTo(0, FINISH_H); ctx.lineTo(GAME_W, FINISH_H); ctx.stroke();
       ctx.restore();
@@ -141,8 +139,6 @@ const Board = (() => {
       for (const o of obstacles) {
         if (o.moving) {
           ctx.save();
-          ctx.shadowColor = '#fb7185';
-          ctx.shadowBlur = 10;
           ctx.fillStyle = '#3d1220';
           roundRect(ctx, o.x, o.y, o.w, o.h, 5); ctx.fill();
           ctx.clip();
@@ -187,12 +183,8 @@ const Board = (() => {
         // the server's grace flag marks a sprite recovering from a hit — flash it
         const flashing = !!s.grace;
 
-        ctx.save();
-        ctx.shadowColor = flashing ? '#fb7185' : s.color;
-        ctx.shadowBlur = 12;
         ctx.fillStyle = flashing ? '#fca5a5' : s.color;
         roundRect(ctx, s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
-        ctx.restore();
 
         // eyes for a bit of character
         ctx.fillStyle = '#fff';

@@ -90,12 +90,15 @@ owns the theme's board conventions:
 
 - Deep-space gradient background with a twinkling starfield.
 - The finish line is a **glowing cyan goal gate** at the top.
-- Moving obstacles: dark rounded rects with rose warning stripes + red glow.
-  Static obstacles: grey rocks with a subtle top highlight.
-- Sprites: rounded squares in their team colour with a matching glow, white
-  eyes, a fading **thruster trail** of recent positions, a red flash when
-  bumped back to the start, 🏁 when finished, 👑 on the leader
-  (dashboard only, `opts.showLead`).
+- Moving obstacles: dark rounded rects with rose warning stripes. Static
+  obstacles: grey rocks with a subtle top highlight.
+- Sprites: rounded squares in their team colour, white eyes, a fading
+  **thruster trail** of recent positions, a red flash when bumped back, 🏁 when
+  finished, 👑 on the leader (dashboard only, `opts.showLead`).
+
+Canvas `shadowBlur` glows were removed for mobile performance (they were the
+dominant per-frame cost) — keep flat fills and gradients; do not reintroduce
+per-object shadow blur in the render loop.
 
 The renderer is presentation-only: it must draw solely from the broadcast
 state (`sprites`, `obstacles`, `leadTeam`) and must never receive or infer

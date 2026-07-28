@@ -206,10 +206,18 @@
       if (n === 0) setTimeout(() => el.classList.remove('show'), 650);
     }
 
+    // --- haptics: a short buzz on a valid press, where the device supports it
+    //     (Android Chrome does; iOS Safari has no Vibration API, so it no-ops) ---
+    const canVibrate = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+    function haptic(ms) { if (canVibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
+
     // --- d-pad. Only the button(s) a player actually controls are shown, so
     //     nobody guesses their direction — they just have to find their sprite. ---
     document.querySelectorAll('.pad button').forEach(b => {
-      const fire = (ev) => { ev.preventDefault(); if (myDirs.includes(b.dataset.dir)) send({ type: 'move', dir: b.dataset.dir }); };
+      const fire = (ev) => {
+        ev.preventDefault();
+        if (myDirs.includes(b.dataset.dir)) { send({ type: 'move', dir: b.dataset.dir }); haptic(12); }
+      };
       b.addEventListener('pointerdown', fire);
     });
     const keymap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
