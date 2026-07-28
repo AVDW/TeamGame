@@ -135,7 +135,7 @@
   <script src="/confetti.js"></script>
   <script>
     let ws;
-    let sprites = [], obstacles = [], myDirs = [];
+    let myDirs = [];
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
 
     // --- screen helper ---
@@ -157,6 +157,7 @@
       switch (msg.type) {
         case 'lobby':
           confetti.stop();
+          board.stop();
           document.getElementById('count').textContent = msg.count;
           document.getElementById('playerList').innerHTML =
             msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
@@ -171,18 +172,22 @@
           myDirs = msg.dirs || [];
           configurePad();
           show('game');
+          board.start();
           break;
         case 'countdown':
           showCountdown(msg.n);
+          board.start();
           break;
-        case 'state':
-          sprites = msg.sprites; obstacles = msg.obstacles;
+        case 'state': {
           const timerEl = document.getElementById('timer');
           timerEl.textContent = fmt(msg.timer);
           timerEl.classList.toggle('low', msg.timer <= 15);
-          board.draw({ sprites, obstacles });
+          board.update(msg);  // smoothly interpolated by the render loop
+          board.start();
           break;
+        }
         case 'end':
+          board.stop();
           renderEnd(msg);
           show('end');
           break;
@@ -201,10 +206,18 @@
       if (n === 0) setTimeout(() => el.classList.remove('show'), 650);
     }
 
+    // --- haptics: a short buzz on a valid press, where the device supports it
+    //     (Android Chrome does; iOS Safari has no Vibration API, so it no-ops) ---
+    const canVibrate = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+    function haptic(ms) { if (canVibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
+
     // --- d-pad. Only the button(s) a player actually controls are shown, so
     //     nobody guesses their direction — they just have to find their sprite. ---
     document.querySelectorAll('.pad button').forEach(b => {
-      const fire = (ev) => { ev.preventDefault(); if (myDirs.includes(b.dataset.dir)) send({ type: 'move', dir: b.dataset.dir }); };
+      const fire = (ev) => {
+        ev.preventDefault();
+        if (myDirs.includes(b.dataset.dir)) { send({ type: 'move', dir: b.dataset.dir }); haptic(12); }
+      };
       b.addEventListener('pointerdown', fire);
     });
     const keymap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };

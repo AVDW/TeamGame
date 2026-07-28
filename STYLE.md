@@ -79,18 +79,26 @@ red team's sprite; keep any new hazard type visually patterned, not flat.
 
 ## The board (canvas)
 
-All board drawing goes through `Board.attach(canvas, opts).draw(state)` in
-`public/board.js` — do not hand-roll canvas drawing in a page. The renderer
+All board drawing goes through `Board.attach(canvas, opts)` in
+`public/board.js` — do not hand-roll canvas drawing in a page. Feed it each
+server `state` message with `board.update(state)` and run the render loop with
+`board.start()` / `board.stop()`; the renderer buffers the two latest snapshots
+and **interpolates between them in a `requestAnimationFrame` loop**, so motion
+is smooth ~60fps even though the server only broadcasts ~10×/sec. (Draw is
+also exposed as `board.draw(state)` for one-off static frames.) The renderer
 owns the theme's board conventions:
 
 - Deep-space gradient background with a twinkling starfield.
 - The finish line is a **glowing cyan goal gate** at the top.
-- Moving obstacles: dark rounded rects with rose warning stripes + red glow.
-  Static obstacles: grey rocks with a subtle top highlight.
-- Sprites: rounded squares in their team colour with a matching glow, white
-  eyes, a fading **thruster trail** of recent positions, a red flash when
-  bumped back to the start, 🏁 when finished, 👑 on the leader
-  (dashboard only, `opts.showLead`).
+- Moving obstacles: dark rounded rects with rose warning stripes. Static
+  obstacles: grey rocks with a subtle top highlight.
+- Sprites: rounded squares in their team colour, white eyes, a fading
+  **thruster trail** of recent positions, a red flash when bumped back, 🏁 when
+  finished, 👑 on the leader (dashboard only, `opts.showLead`).
+
+Canvas `shadowBlur` glows were removed for mobile performance (they were the
+dominant per-frame cost) — keep flat fills and gradients; do not reintroduce
+per-object shadow blur in the render loop.
 
 The renderer is presentation-only: it must draw solely from the broadcast
 state (`sprites`, `obstacles`, `leadTeam`) and must never receive or infer

@@ -3,15 +3,24 @@
    so the board looks identical everywhere. Draws only what the server
    broadcasts — sprites, obstacles, progress — never ownership info.
 
+   The server only broadcasts state ~10×/sec, so drawing straight from those
+   packets looks choppy. Instead we buffer the two most recent snapshots and
+   run our own requestAnimationFrame loop that INTERPOLATES between them, giving
+   smooth ~60fps motion (rendering ~one tick / 100ms in the past) with no extra
+   network traffic.
+
    Usage:
      const board = Board.attach(document.getElementById('canvas'), { showLead: true });
-     board.draw({ sprites, obstacles, leadTeam });
+     board.update(stateMsg); // feed each server 'state' message
+     board.start();          // begin the render loop (idempotent)
+     board.stop();           // stop and clear (e.g. back to lobby)
 */
 const Board = (() => {
   const GAME_W = 400, GAME_H = 600;
   const SPRITE_SIZE = 24;
   const FINISH_H = 28;
-  const TRAIL_LEN = 7;
+  const TRAIL_LEN = 8;
+  const TRAIL_MS = 45; // record a trail point at most this often (time-based, not per-frame)
 
   function makeStars() {
     const stars = [];
@@ -41,7 +50,60 @@ const Board = (() => {
   function attach(canvas, opts = {}) {
     const ctx = canvas.getContext('2d');
     const stars = makeStars();
-    const trails = new Map(); // team -> [{x, y}]
+    const trails = new Map();  // team -> [{x, y}]
+    const trailT = new Map();  // team -> last-recorded timestamp
+
+    // Snapshot buffer for interpolation.
+    let prev = null, next = null, prevT = 0, nextT = 0;
+    let raf = null;
+
+    // Feed a fresh server state; keep the previous one to interpolate from.
+    function update(state) {
+      const now = performance.now();
+      if (!next) { prev = state; next = state; prevT = now; nextT = now; }
+      else { prev = next; next = state; prevT = nextT; nextT = now; }
+    }
+
+    // Interpolated view of the world, rendered ~one tick behind real time so
+    // there's always a "next" snapshot to head toward.
+    function interpolated() {
+      if (!next) return null;
+      const span = nextT - prevT;
+      let a = span > 0 ? (performance.now() - nextT) / span : 1;
+      a = a < 0 ? 0 : a > 1 ? 1 : a;
+      if (!prev || span === 0) return next;
+
+      const prevByTeam = new Map(prev.sprites.map((s) => [s.team, s]));
+      const sprites = next.sprites.map((s) => {
+        const p = prevByTeam.get(s.team) || s;
+        return { ...s, x: p.x + (s.x - p.x) * a, y: p.y + (s.y - p.y) * a };
+      });
+      const obstacles = next.obstacles.map((o, i) => {
+        const p = prev.obstacles[i] || o;
+        return { ...o, x: p.x + (o.x - p.x) * a, y: p.y + (o.y - p.y) * a };
+      });
+      return { sprites, obstacles };
+    }
+
+    function frame() {
+      const world = interpolated();
+      if (world) {
+        let leadTeam = null;
+        if (opts.showLead) {
+          let best = -1;
+          for (const s of world.sprites) if (s.progress > best) { best = s.progress; leadTeam = s.team; }
+        }
+        draw({ sprites: world.sprites, obstacles: world.obstacles, leadTeam });
+      }
+      raf = requestAnimationFrame(frame);
+    }
+
+    function start() { if (!raf) raf = requestAnimationFrame(frame); }
+    function stop() {
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      prev = next = null;
+      trails.clear(); trailT.clear();
+    }
 
     function draw(state) {
       const { sprites = [], obstacles = [], leadTeam = null } = state;
@@ -54,7 +116,7 @@ const Board = (() => {
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, GAME_W, GAME_H);
 
-      // twinkling starfield
+      // twinkling starfield (now animates every frame, not every server tick)
       for (const st of stars) {
         const a = st.base + 0.25 * Math.sin(st.phase + now / 1000 * st.speed);
         ctx.fillStyle = `rgba(233,237,255,${Math.max(0.05, a)})`;
@@ -69,8 +131,6 @@ const Board = (() => {
       ctx.fillRect(0, 0, GAME_W, FINISH_H + 14);
       ctx.save();
       ctx.strokeStyle = 'rgba(76,201,240,0.8)';
-      ctx.shadowColor = '#4cc9f0';
-      ctx.shadowBlur = 8;
       ctx.setLineDash([8, 6]);
       ctx.beginPath(); ctx.moveTo(0, FINISH_H); ctx.lineTo(GAME_W, FINISH_H); ctx.stroke();
       ctx.restore();
@@ -79,8 +139,6 @@ const Board = (() => {
       for (const o of obstacles) {
         if (o.moving) {
           ctx.save();
-          ctx.shadowColor = '#fb7185';
-          ctx.shadowBlur = 10;
           ctx.fillStyle = '#3d1220';
           roundRect(ctx, o.x, o.y, o.w, o.h, 5); ctx.fill();
           ctx.clip();
@@ -101,14 +159,14 @@ const Board = (() => {
         }
       }
 
-      // thruster trails (fading echoes of recent positions)
+      // thruster trails (fading echoes of recent positions, sampled by time)
       for (const s of sprites) {
         let trail = trails.get(s.team);
         if (!trail) { trail = []; trails.set(s.team, trail); }
-        const last = trail[trail.length - 1];
-        if (!last || last.x !== s.x || last.y !== s.y) {
+        if (now - (trailT.get(s.team) || 0) > TRAIL_MS) {
           trail.push({ x: s.x, y: s.y });
           if (trail.length > TRAIL_LEN) trail.shift();
+          trailT.set(s.team, now);
         }
         for (let i = 0; i < trail.length - 1; i++) {
           const t = trail[i];
@@ -125,12 +183,8 @@ const Board = (() => {
         // the server's grace flag marks a sprite recovering from a hit — flash it
         const flashing = !!s.grace;
 
-        ctx.save();
-        ctx.shadowColor = flashing ? '#fb7185' : s.color;
-        ctx.shadowBlur = 12;
         ctx.fillStyle = flashing ? '#fca5a5' : s.color;
         roundRect(ctx, s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
-        ctx.restore();
 
         // eyes for a bit of character
         ctx.fillStyle = '#fff';
@@ -148,7 +202,7 @@ const Board = (() => {
       }
     }
 
-    return { draw };
+    return { draw, update, start, stop };
   }
 
   function hexAlpha(hex, a) {

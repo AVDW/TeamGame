@@ -55,6 +55,11 @@
     .seg { display: flex; gap: .6vw; }
     .seg button { flex: 1; padding: 1.3vh .3vw; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-2); font-size: clamp(13px, 1.1vw, 20px); font-weight: 800; font-family: var(--font); cursor: pointer; }
     .seg button.on { background: linear-gradient(135deg, var(--accent), #2a9fd8); color: #04121f; border-color: transparent; box-shadow: var(--glow-accent); }
+    .stepper { display: flex; align-items: center; gap: .8vw; }
+    .stepper button { width: clamp(48px, 4.5vw, 68px); padding: 1.2vh 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--accent); font-size: clamp(22px, 2vw, 32px); font-weight: 900; font-family: var(--font); line-height: 1; cursor: pointer; }
+    .stepper button:disabled { color: var(--ink-3); opacity: .45; cursor: default; }
+    .stepper button:active:not(:disabled) { background: var(--accent-2); color: #04121f; }
+    .stepval { flex: 1; text-align: center; font-size: clamp(24px, 2.6vw, 44px); font-weight: 900; font-variant-numeric: tabular-nums; }
     .setuppanel .btn-primary { margin-top: auto; }
     #startHint { margin-top: 1.2vh; }
 
@@ -153,8 +158,10 @@
           <h2>Game setup</h2>
           <div class="cfg">
             <label>Race length</label>
-            <div class="seg" id="segTime">
-              <button data-v="60">60s</button><button data-v="90">90s</button><button data-v="120" class="on">2 min</button><button data-v="180">3 min</button>
+            <div class="stepper" id="stepTime">
+              <button type="button" id="timeMinus" aria-label="Less time">−</button>
+              <div class="stepval" id="timeVal">2:00</div>
+              <button type="button" id="timePlus" aria-label="More time">+</button>
             </div>
           </div>
           <div class="cfg">
@@ -189,7 +196,7 @@
   <script src="/board.js"></script>
   <script src="/confetti.js"></script>
   <script>
-    let sprites = [], obstacles = [], leadTeam = null;
+    let leadTeam = null;
 
     // ---- join QR code ----
     // Players join at the site root; the dashboard lives at /display. Encode the
@@ -240,9 +247,20 @@
         cfg[key] = cast(b.dataset.v);
       }));
     }
-    wireSeg('segTime', 'seconds', (v) => Number(v));
     wireSeg('segDiff', 'difficulty', (v) => v);
     wireSeg('segTeams', 'teams', (v) => (v === 'auto' ? 'auto' : Number(v)));
+
+    // Race length stepper: adjustable in 30s steps, 0:30 up to 5:00.
+    const TIME_MIN = 30, TIME_MAX = 300, TIME_STEP = 30;
+    const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    function renderTime() {
+      document.getElementById('timeVal').textContent = fmtClock(cfg.seconds);
+      document.getElementById('timeMinus').disabled = cfg.seconds <= TIME_MIN;
+      document.getElementById('timePlus').disabled = cfg.seconds >= TIME_MAX;
+    }
+    document.getElementById('timeMinus').addEventListener('click', () => { cfg.seconds = Math.max(TIME_MIN, cfg.seconds - TIME_STEP); renderTime(); });
+    document.getElementById('timePlus').addEventListener('click', () => { cfg.seconds = Math.min(TIME_MAX, cfg.seconds + TIME_STEP); renderTime(); });
+    renderTime();
     document.getElementById('startBtn').addEventListener('click', () => send({ type: 'start', config: cfg }));
     document.getElementById('newRaceBtn').addEventListener('click', () => send({ type: 'reset' }));
 
@@ -263,6 +281,7 @@
     function handle(msg) {
       if (msg.type === 'lobby') {
         confetti.stop();
+        board.stop();
         show('finished', false);
         showView('lobby');
         const c = msg.count;
@@ -280,18 +299,20 @@
         confetti.stop();
         show('finished', false);
         showView('race');
+        board.start();
         showCountdown(msg.n);
       }
       else if (msg.type === 'state') {
         confetti.stop();
         show('finished', false);
         showView('race');
-        sprites = msg.sprites; obstacles = msg.obstacles;
         updateStats(msg);
         renderLeaderboard(msg.sprites);
-        board.draw({ sprites, obstacles, leadTeam });
+        board.update(msg);  // smoothly interpolated by the render loop
+        board.start();
       }
       else if (msg.type === 'end') {
+        board.stop();
         renderFinished(msg);
         show('finished', true);
         const wc = msg.standings && msg.standings[0] ? msg.standings[0].color : null;
@@ -299,6 +320,7 @@
       }
       else if (msg.type === 'inprogress') {
         showView('race');
+        board.start();
       }
     }
 
