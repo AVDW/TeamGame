@@ -3,60 +3,51 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#060a1a" />
   <title>Sprite Race</title>
+  <link rel="stylesheet" href="/theme.css" />
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body {
-      margin: 0; height: 100%;
-      background: #0f172a; color: #e2e8f0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      overscroll-behavior: none;
-    }
+    /* Page-specific layout — shared look lives in theme.css */
     body { display: flex; flex-direction: column; align-items: center; }
     .screen { width: 100%; max-width: 460px; padding: 16px; flex: 1; display: none; flex-direction: column; }
     .screen.active { display: flex; }
-    h1 { font-size: 24px; margin: 6px 0 2px; text-align: center; }
-    .tag { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 14px; }
-    .card { background: #1e293b; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
-    .card h3 { margin: 0 0 8px; font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-    input {
-      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #334155;
-      background: #0f172a; color: #e2e8f0; font-size: 16px;
-    }
-    .seg { display: flex; gap: 8px; margin-top: 4px; }
-    .seg button {
-      flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #334155;
-      background: #0f172a; color: #e2e8f0; font-size: 16px; font-weight: 600;
-    }
-    .seg button.on { background: #2563eb; border-color: #2563eb; }
-    button.primary {
-      width: 100%; padding: 16px; border: none; border-radius: 12px;
-      background: #22c55e; color: #052e16; font-size: 18px; font-weight: 800;
-    }
-    button.primary:disabled { background: #334155; color: #64748b; }
-    button.ghost {
-      width: 100%; padding: 14px; border: 1px solid #334155; border-radius: 12px;
-      background: transparent; color: #e2e8f0; font-size: 16px; font-weight: 700; margin-top: 10px;
-    }
+    h1 { font-size: 26px; margin: 6px 0 2px; text-align: center; }
+    h1 .rocket { -webkit-text-fill-color: initial; }
+    .tag { margin-bottom: 14px; }
     .players { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { background: #0f172a; border: 1px solid #334155; border-radius: 999px; padding: 5px 12px; font-size: 13px; }
-    .count { font-size: 40px; font-weight: 800; text-align: center; }
+    .count { font-size: 40px; font-weight: 800; text-align: center; color: var(--accent); }
+    .howto { font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+    .muted { margin-top: 8px; }
 
-    /* Game screen */
+    /* Game screen (scoped to #canvas so it doesn't hit the confetti overlay) */
     #boardWrap { position: relative; width: 100%; max-width: 400px; margin: 0 auto; }
-    #canvas { width: 100%; height: auto; display: block; border-radius: 12px; background: #f1f5f9; }
+    #canvas {
+      width: 100%; height: auto; display: block;
+      border-radius: 12px; border: 1px solid var(--line);
+      background: #070b1e;
+    }
     .hud { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; margin: 0 auto 8px; }
-    .timer { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .hint { font-size: 12px; color: #94a3b8; }
+    .timer { font-size: 22px; }
+    .hint { font-size: 12px; color: var(--ink-2); }
+    .hint b { color: var(--accent); }
 
     /* D-pad */
     .pad { margin: 18px auto 0; display: grid; grid-template-columns: repeat(3, 74px); grid-template-rows: repeat(3, 74px); gap: 10px; justify-content: center; }
     .pad button {
-      border: none; border-radius: 16px; background: #334155; color: #e2e8f0;
-      font-size: 30px; font-weight: 800; touch-action: manipulation; user-select: none;
+      border: 1px solid var(--line); border-radius: 16px;
+      background: linear-gradient(180deg, var(--surface-2), var(--surface));
+      color: var(--accent);
+      font-size: 30px; font-weight: 800;
+      touch-action: manipulation; user-select: none;
+      box-shadow: 0 0 10px rgba(76, 201, 240, 0.12);
     }
-    .pad button:active { background: #2563eb; transform: scale(0.94); }
+    .pad button:active {
+      background: var(--accent-2);
+      border-color: var(--accent-2);
+      color: #0d0620;
+      box-shadow: 0 0 18px rgba(167, 139, 250, 0.5);
+      transform: scale(0.94);
+    }
     .pad .up { grid-column: 2; grid-row: 1; }
     .pad .left { grid-column: 1; grid-row: 2; }
     .pad .right { grid-column: 3; grid-row: 2; }
@@ -64,43 +55,42 @@
 
     /* End screen */
     .banner { text-align: center; font-size: 26px; font-weight: 900; margin: 8px 0; }
+    .banner.win { color: var(--good); text-shadow: 0 0 20px rgba(52, 211, 153, 0.5); }
     .reveal { text-align: center; font-size: 15px; line-height: 1.5; }
-    .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin: 0 4px; }
     table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    td { padding: 6px 4px; border-bottom: 1px solid #334155; font-size: 14px; }
-    .muted { color: #64748b; font-size: 12px; text-align: center; margin-top: 4px; }
+    td { padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 14px; }
   </style>
 </head>
 <body>
 
   <!-- LOBBY -->
   <section id="lobby" class="screen active">
-    <h1>🏁 Sprite Race</h1>
+    <h1><span class="rocket">🚀</span> <span class="title-glow">Sprite Race</span></h1>
     <div class="tag" id="conn">Connecting…</div>
 
     <div class="card">
       <h3>Your name</h3>
-      <input id="name" placeholder="e.g. Sam" maxlength="16" autocomplete="off" />
+      <input id="name" class="field" placeholder="e.g. Sam" maxlength="16" autocomplete="off" />
     </div>
 
     <div class="card">
-      <h3>Players in the room</h3>
+      <h3>Pilots in the room</h3>
       <div class="count" id="count">0</div>
       <div class="players" id="playerList"></div>
     </div>
 
     <div class="card">
       <h3>How it works</h3>
-      <div style="font-size:14px; line-height:1.55; color:#cbd5e1;">
-        You'll be split into secret teams. Each team drives <b>one sprite</b> up
+      <div class="howto">
+        You'll be split into secret teams. Each team flies <b>one sprite</b> up
         the screen. You'll each control <b>just one direction</b> (we'll show you
         which) — but <b>you're not told which sprite is yours</b>. Press your
         button, watch the board to spot your sprite, and coordinate with your team
-        to weave past the traps. First team to the top wins. 🏆
+        to weave past the hazards. First team to the goal gate wins. 🏆
       </div>
     </div>
 
-    <button class="primary" id="startBtn" disabled>Start Race</button>
+    <button class="btn-primary" id="startBtn" disabled>Launch Race</button>
     <div class="muted">Anyone can start once everyone's in. Teams are formed automatically — the more players, the more sprites to race.</div>
   </section>
 
@@ -129,13 +119,14 @@
       <h3>Final standings</h3>
       <table id="standings"></table>
     </div>
-    <button class="ghost" id="backBtn">Back to lobby</button>
+    <button class="btn-ghost" id="backBtn">Back to lobby</button>
   </section>
 
   <canvas id="fx" style="position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50;"></canvas>
 
+  <script src="/board.js"></script>
+  <script src="/confetti.js"></script>
   <script>
-    const SPRITE_SIZE = 24;
     let ws;
     let sprites = [], obstacles = [], myDirs = [];
     const DIR_LABEL = { up: '▲ UP', down: '▼ DOWN', left: '◀ LEFT', right: '▶ RIGHT' };
@@ -158,6 +149,7 @@
     function handle(msg) {
       switch (msg.type) {
         case 'lobby':
+          confetti.stop();
           document.getElementById('count').textContent = msg.count;
           document.getElementById('playerList').innerHTML =
             msg.names.map(n => `<span class="chip">${escapeHtml(n)}</span>`).join('');
@@ -169,14 +161,17 @@
           show('lobby');
           break;
         case 'start':
+          confetti.stop();
           myDirs = msg.dirs || [];
           configurePad();
           show('game');
           break;
         case 'state':
           sprites = msg.sprites; obstacles = msg.obstacles;
-          document.getElementById('timer').textContent = fmt(msg.timer);
-          draw();
+          const timerEl = document.getElementById('timer');
+          timerEl.textContent = fmt(msg.timer);
+          timerEl.classList.toggle('low', msg.timer <= 15);
+          board.draw({ sprites, obstacles });
           break;
         case 'end':
           renderEnd(msg);
@@ -214,82 +209,17 @@
       else hint.innerHTML = `You control <b>${myDirs.map(d => DIR_LABEL[d]).join(' & ')}</b> — find your sprite!`;
     }
 
-    // --- rendering ---
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // finish zone
-      ctx.fillStyle = 'rgba(34,197,94,0.12)';
-      ctx.fillRect(0, 0, canvas.width, 28);
-      ctx.strokeStyle = 'rgba(34,197,94,0.5)'; ctx.setLineDash([8, 6]);
-      ctx.beginPath(); ctx.moveTo(0, 28); ctx.lineTo(canvas.width, 28); ctx.stroke(); ctx.setLineDash([]);
-
-      // obstacles
-      for (const o of obstacles) {
-        ctx.fillStyle = o.moving ? '#ef4444' : '#475569';
-        roundRect(o.x, o.y, o.w, o.h, 5); ctx.fill();
-      }
-
-      // sprites
-      for (const s of sprites) {
-        // flash red briefly right after a trap knocks the sprite back
-        ctx.fillStyle = s.grace ? '#fca5a5' : s.color;
-        roundRect(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
-        // eyes for a bit of character
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(s.x + 5, s.y + 7, 4, 4);
-        ctx.fillRect(s.x + SPRITE_SIZE - 9, s.y + 7, 4, 4);
-        if (s.finished) {
-          ctx.fillStyle = '#052e16'; ctx.font = 'bold 14px sans-serif';
-          ctx.fillText('🏁', s.x + 3, s.y + 18);
-        }
-      }
-    }
-    function roundRect(x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    }
-
-    // --- winner confetti ---
-    const fx = document.getElementById('fx'), fxc = fx.getContext('2d');
-    let fxParts = [], fxUntil = 0, fxRAF = null, fxColors = ['#22c55e', '#fbbf24', '#38bdf8', '#ffffff'];
-    function fxNew() {
-      return { x: Math.random() * fx.width, y: -20 - Math.random() * 300, vx: (Math.random() - 0.5) * 3,
-        vy: 4 + Math.random() * 5, s: 5 + Math.random() * 7, c: fxColors[Math.floor(Math.random() * fxColors.length)],
-        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3 };
-    }
-    function celebrate(color) {
-      if (color) fxColors = [color, '#fbbf24', '#ffffff', '#38bdf8'];
-      fx.width = innerWidth; fx.height = innerHeight;
-      fxParts = Array.from({ length: 140 }, fxNew);
-      fxUntil = performance.now() + 5500;
-      if (!fxRAF) fxRAF = requestAnimationFrame(fxTick);
-    }
-    function fxTick(now) {
-      fxc.clearRect(0, 0, fx.width, fx.height);
-      for (const p of fxParts) {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.r += p.vr;
-        if (p.y > fx.height + 20 && now < fxUntil) { Object.assign(p, fxNew()); p.y = -20; }
-        fxc.save(); fxc.translate(p.x, p.y); fxc.rotate(p.r); fxc.fillStyle = p.c;
-        fxc.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); fxc.restore();
-      }
-      if (now < fxUntil || fxParts.some(p => p.y < fx.height + 20)) fxRAF = requestAnimationFrame(fxTick);
-      else { fxRAF = null; fxc.clearRect(0, 0, fx.width, fx.height); }
-    }
+    // --- rendering (shared renderers in board.js / confetti.js) ---
+    const board = Board.attach(document.getElementById('canvas'));
+    const confetti = Confetti.attach(document.getElementById('fx'), { count: 140, duration: 5500 });
 
     // --- end screen ---
     function renderEnd(msg) {
       const banner = document.getElementById('banner');
-      if (msg.youWon) { banner.textContent = '🏆 You won!'; banner.style.color = '#22c55e'; celebrate(msg.yourColor); }
-      else if (msg.winnerName) { banner.textContent = `${msg.winnerName} team wins`; banner.style.color = '#e2e8f0'; }
-      else { banner.textContent = "Time's up!"; banner.style.color = '#e2e8f0'; }
+      banner.classList.toggle('win', !!msg.youWon);
+      if (msg.youWon) { banner.textContent = '🏆 You won!'; confetti.launch(msg.yourColor ? [msg.yourColor] : null); }
+      else if (msg.winnerName) banner.textContent = `${msg.winnerName} team wins`;
+      else banner.textContent = "Time's up!";
 
       const reveal = document.getElementById('reveal');
       if (msg.yourTeam !== null && msg.yourColor) {
@@ -297,7 +227,7 @@
         const plural = (msg.yourDirs || []).length > 1;
         reveal.innerHTML =
           `You were on the <b>${escapeHtml(msg.yourSpriteName)}</b> team` +
-          `<span class="swatch" style="background:${msg.yourColor}"></span><br>` +
+          `<span class="swatch" style="background:${msg.yourColor}; color:${msg.yourColor}"></span><br>` +
           `Your control${plural ? 's were' : ' was'} <b>${dirs}</b>.` +
           `<div class="muted">Did you spot your sprite in time?</div>`;
       } else {
@@ -306,10 +236,10 @@
 
       document.getElementById('standings').innerHTML = msg.standings.map((s, i) => `
         <tr>
-          <td style="width:24px;color:#64748b;">${i + 1}</td>
-          <td><span class="swatch" style="background:${s.color}"></span> ${escapeHtml(s.name)}</td>
+          <td style="width:24px;color:var(--ink-3);">${i + 1}</td>
+          <td><span class="swatch" style="background:${s.color}; color:${s.color}"></span> ${escapeHtml(s.name)}</td>
           <td style="text-align:right;">${s.finished ? '🏁 finished' : Math.round(s.progress * 100) + '%'}</td>
-          <td style="text-align:right;color:#64748b;">${s.bump} bumps</td>
+          <td style="text-align:right;color:var(--ink-3);">${s.bump} bumps</td>
         </tr>`).join('');
     }
 

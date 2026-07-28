@@ -32,7 +32,9 @@ const MAX_TEAMS = 4; // cap on sprites so the board stays readable
 const START_MARGIN = 12;
 const START_Y = GAME_HEIGHT - SPRITE_SIZE - START_MARGIN;
 
-const COLORS = ['#22c55e', '#3b82f6', '#ef4444', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#eab308'];
+// Team palette tuned for the dark space board — bright 400-weight tones that
+// stay readable with a glow around them (see STYLE.md).
+const COLORS = ['#4ade80', '#60a5fa', '#f87171', '#fb923c', '#c084fc', '#f472b6', '#2dd4bf', '#facc15'];
 const NAMES = ['Green', 'Blue', 'Red', 'Orange', 'Purple', 'Pink', 'Teal', 'Yellow'];
 
 // ---- helpers --------------------------------------------------------------
