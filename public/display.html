@@ -3,68 +3,51 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#060a1a" />
   <title>Sprite Race — Dashboard</title>
+  <link rel="stylesheet" href="/theme.css" />
   <style>
-    /* Front-of-room dashboard. Dark, high-contrast, readable across a room.
+    /* Front-of-room dashboard. High-contrast, readable across a room.
        Shows only board-equivalent aggregates — no player→sprite mapping, so
-       putting it on the big screen gives no player an advantage. */
-    :root {
-      --bg: #0b1220;
-      --surface: #131c2e;
-      --surface-2: #1b263c;
-      --ink: #f1f5f9;
-      --ink-2: #b6c2d4;
-      --ink-3: #7c8aa3;
-      --line: #263349;
-      --accent: #38bdf8;
-    }
-    * { box-sizing: border-box; margin: 0; }
-    html, body { height: 100%; }
-    body {
-      background: radial-gradient(1200px 800px at 70% -10%, #16233c 0%, var(--bg) 60%);
-      color: var(--ink);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      overflow: hidden;
-    }
+       putting it on the big screen gives no player an advantage.
+       Shared tokens/components come from theme.css; layout lives here. */
+    body { overflow: hidden; }
     .wrap { height: 100vh; display: flex; flex-direction: column; padding: 2.2vh 2vw; gap: 1.6vh; }
 
     /* Header */
     header { display: flex; align-items: center; gap: 1.4vw; }
-    .brand { font-size: clamp(20px, 2.4vw, 40px); font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; }
-    .brand .flag { margin-right: .4vw; }
+    .brand { font-size: clamp(20px, 2.4vw, 40px); white-space: nowrap; }
+    .brand .rocket { margin-right: .4vw; }
     .tiles { margin-left: auto; display: flex; gap: 1vw; }
     .tile {
-      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
       padding: 1vh 1.3vw; min-width: 8.5vw; text-align: center;
     }
     .tile .k { font-size: clamp(10px, .8vw, 14px); color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
     .tile .v { font-size: clamp(22px, 2.6vw, 46px); font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.05; }
-    .tile.time .v { color: #fff; }
-    .tile.time.low .v { color: #fb7185; }
 
-    /* Body: board + side panel */
+    /* Body: board + side panel (board CSS scoped to #canvas — not the confetti overlay) */
     .body { flex: 1; display: flex; gap: 1.6vw; min-height: 0; }
     .boardWrap {
-      background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
       padding: 1.4vh 1.4vh; display: flex; align-items: center; justify-content: center; min-width: 0;
     }
-    #canvas { height: 100%; width: auto; max-width: 100%; border-radius: 12px; background: #eef2f7; display: block; }
+    #canvas { height: 100%; width: auto; max-width: 100%; border-radius: 12px; background: #070b1e; display: block; }
 
     .side { width: 34vw; max-width: 560px; display: flex; flex-direction: column; gap: 1.6vh; min-height: 0; }
-    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.6vh 1.3vw; }
-    .panel h2 { font-size: clamp(12px, 1vw, 16px); color: var(--ink-3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1.2vh; font-weight: 800; }
+    .panel { padding: 1.6vh 1.3vw; }
+    .panel h2 { font-size: clamp(12px, 1vw, 16px); margin-bottom: 1.2vh; }
 
     /* Leaderboard */
     .board-list { flex: 1; overflow: hidden; }
     .row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .9vw; padding: 1.05vh 0; border-top: 1px solid var(--line); }
     .row:first-of-type { border-top: none; }
     .rank { font-size: clamp(16px, 1.5vw, 26px); font-weight: 900; color: var(--ink-3); width: 2.4vw; text-align: center; font-variant-numeric: tabular-nums; }
-    .row.lead .rank { color: #fbbf24; }
+    .row.lead .rank { color: var(--warn); }
     .who { min-width: 0; }
     .name { display: flex; align-items: center; gap: .6vw; font-size: clamp(15px, 1.5vw, 27px); font-weight: 800; }
-    .swatch { width: 1.4vw; height: 1.4vw; min-width: 14px; min-height: 14px; border-radius: 5px; }
-    .bar { margin-top: .7vh; height: 1.2vh; min-height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-    .bar > span { display: block; height: 100%; border-radius: 999px; transition: width .12s linear; }
+    .name .swatch { width: 1.4vw; height: 1.4vw; min-width: 14px; min-height: 14px; border-radius: 5px; }
+    .bar { margin-top: .7vh; height: 1.2vh; min-height: 9px; }
     .meta { text-align: right; white-space: nowrap; }
     .pct { font-size: clamp(15px, 1.5vw, 27px); font-weight: 900; font-variant-numeric: tabular-nums; }
     .crash { font-size: clamp(10px, .85vw, 15px); color: var(--ink-3); font-weight: 700; }
@@ -76,22 +59,22 @@
     .apm .v { font-size: clamp(26px, 3.4vw, 60px); font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
     .apm .k { font-size: clamp(9px, .8vw, 13px); color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; margin-top: .4vh; }
     .spark { flex: 1; display: flex; align-items: flex-end; gap: 3px; height: 7vh; }
-    .spark > i { flex: 1; background: linear-gradient(180deg, var(--accent), #0ea5e9); border-radius: 3px 3px 0 0; height: 4%; transition: height .18s ease; }
+    .spark > i { flex: 1; background: linear-gradient(180deg, var(--accent), var(--accent-2)); border-radius: 3px 3px 0 0; height: 4%; transition: height .18s ease; }
 
     /* Overlays: lobby + finished */
-    .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4vh; background: rgba(11,18,32,.72); backdrop-filter: blur(4px); }
+    .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4vh; background: rgba(6,10,26,.78); backdrop-filter: blur(4px); }
     .overlay.show { display: flex; }
-    .overlay h1 { font-size: clamp(30px, 5vw, 80px); font-weight: 900; margin-bottom: 1.5vh; }
+    .overlay h1 { font-size: clamp(30px, 5vw, 80px); font-weight: 900; margin: 0 0 1.5vh; }
     .overlay p { font-size: clamp(15px, 1.8vw, 30px); color: var(--ink-2); }
     .joins { margin-top: 3vh; display: flex; flex-wrap: wrap; gap: .8vw; justify-content: center; max-width: 80vw; }
-    .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: .7vh 1.1vw; font-size: clamp(13px, 1.2vw, 22px); font-weight: 700; }
-    .big-num { font-size: clamp(48px, 9vw, 150px); font-weight: 900; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .joins .chip { padding: .7vh 1.1vw; font-size: clamp(13px, 1.2vw, 22px); font-weight: 700; }
+    .big-num { font-size: clamp(48px, 9vw, 150px); font-weight: 900; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; text-shadow: 0 0 24px rgba(76,201,240,.4); }
     /* Join box: QR + URL */
     .joinbox { display: flex; align-items: center; gap: 3vw; margin: 1vh 0 1vh; flex-wrap: wrap; justify-content: center; }
-    .qrframe { background: #fff; padding: 1.6vh; border-radius: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+    .qrframe { background: #fff; padding: 1.6vh; border-radius: var(--radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,.5), var(--glow-accent); }
     .qrframe canvas { display: block; width: clamp(180px, 26vh, 320px); height: clamp(180px, 26vh, 320px); image-rendering: pixelated; }
     .joininfo { text-align: left; }
-    .joinurl { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: clamp(18px, 2.2vw, 40px); font-weight: 800; color: #fff; background: var(--surface-2); border: 1px solid var(--line); padding: 1.2vh 1.6vw; border-radius: 12px; word-break: break-all; }
+    .joinurl { font-family: var(--font-mono); font-size: clamp(18px, 2.2vw, 40px); font-weight: 800; color: #fff; background: var(--surface-2); border: 1px solid var(--line); padding: 1.2vh 1.6vw; border-radius: 12px; word-break: break-all; }
     .joincount { margin-top: 2vh; display: flex; align-items: center; gap: 1.2vw; }
     .joincount .big-num { font-size: clamp(40px, 6vw, 96px); }
     .podium { margin-top: 2vh; display: flex; flex-direction: column; gap: 1vh; min-width: 40vw; }
@@ -102,11 +85,11 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="brand"><span class="flag">🏁</span>Sprite Race</div>
+      <div class="brand"><span class="rocket">🚀</span><span class="title-glow">Sprite Race</span></div>
       <div class="tiles">
         <div class="tile"><div class="k">Players</div><div class="v" id="tPlayers">0</div></div>
         <div class="tile"><div class="k">Teams</div><div class="v" id="tTeams">0</div></div>
-        <div class="tile time" id="timeTile"><div class="k">Time</div><div class="v" id="tTime">–</div></div>
+        <div class="tile"><div class="k">Time</div><div class="v timer" id="tTime">–</div></div>
       </div>
     </header>
 
@@ -132,12 +115,12 @@
 
   <!-- Lobby / waiting overlay -->
   <div class="overlay" id="lobby">
-    <h1>📱 Scan to join the race</h1>
+    <h1>📱 <span class="title-glow">Scan to join the race</span></h1>
     <div class="joinbox">
       <div class="qrframe"><canvas id="qr"></canvas></div>
       <div class="joininfo">
         <div class="joinurl" id="joinUrl">…</div>
-        <div class="joincount"><span class="big-num" id="lobbyCount">0</span><span class="dim">players ready — anyone taps <b>Start Race</b></span></div>
+        <div class="joincount"><span class="big-num" id="lobbyCount">0</span><span class="dim">pilots ready — anyone taps <b>Launch Race</b></span></div>
       </div>
     </div>
     <div class="joins" id="joins"></div>
@@ -153,8 +136,9 @@
   </div>
 
   <script src="/qrcode.js"></script>
+  <script src="/board.js"></script>
+  <script src="/confetti.js"></script>
   <script>
-    const SPRITE_SIZE = 24, GAME_W = 400, GAME_H = 600;
     let sprites = [], obstacles = [], leadTeam = null;
 
     // ---- join QR code ----
@@ -174,7 +158,7 @@
         cv.width = cv.height = px;
         const c = cv.getContext('2d');
         c.fillStyle = '#ffffff'; c.fillRect(0, 0, px, px);
-        c.fillStyle = '#0b1220';
+        c.fillStyle = '#060a1a';
         for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
           if (qr.isDark(r, col)) c.fillRect((col + margin) * scale, (r + margin) * scale, scale, scale);
         }
@@ -200,7 +184,7 @@
 
     function handle(msg) {
       if (msg.type === 'lobby') {
-        stopConfetti();
+        confetti.stop();
         show('lobby', true); show('finished', false);
         document.getElementById('lobbyCount').textContent = msg.count;
         document.getElementById('tPlayers').textContent = msg.count;
@@ -209,18 +193,18 @@
         lastInputs = 0; apmEMA = 0;
       }
       else if (msg.type === 'state') {
-        if (confRAF) stopConfetti();
+        confetti.stop();
         show('lobby', false); show('finished', false);
         sprites = msg.sprites; obstacles = msg.obstacles;
         updateStats(msg);
         renderLeaderboard(msg.sprites);
-        draw();
+        board.draw({ sprites, obstacles, leadTeam });
       }
       else if (msg.type === 'end') {
         renderFinished(msg);
         show('finished', true);
         const wc = msg.standings && msg.standings[0] ? msg.standings[0].color : null;
-        launchConfetti(wc ? [wc, '#fbbf24', '#ffffff', '#38bdf8', '#22c55e'] : null);
+        confetti.launch(wc ? [wc] : null);
       }
       else if (msg.type === 'inprogress') {
         show('lobby', false); // a race is on; state will follow
@@ -231,8 +215,9 @@
       document.getElementById('tPlayers').textContent = msg.players;
       document.getElementById('tTeams').textContent = msg.sprites.length;
       const t = msg.timer;
-      document.getElementById('tTime').textContent = `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
-      document.getElementById('timeTile').classList.toggle('low', t <= 15);
+      const timeEl = document.getElementById('tTime');
+      timeEl.textContent = `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
+      timeEl.classList.toggle('low', t <= 15);
 
       // inputs/sec from the aggregate counter delta (reveals nothing about who).
       const now = performance.now();
@@ -263,7 +248,7 @@
         <div class="row ${i === 0 ? 'lead' : ''}">
           <div class="rank">${i === 0 ? '👑' : (i + 1)}</div>
           <div class="who">
-            <div class="name"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</div>
+            <div class="name"><span class="swatch" style="background:${s.color}; color:${s.color}"></span>${esc(s.name)}</div>
             <div class="bar"><span style="width:${Math.round(s.progress*100)}%; background:${s.color}"></span></div>
           </div>
           <div class="meta">
@@ -280,71 +265,16 @@
       document.getElementById('podium').innerHTML = st.map((s, i) => `
         <div class="row">
           <div class="rank">${['🥇','🥈','🥉'][i] || (i+1)}</div>
-          <div class="who"><div class="name"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</div></div>
+          <div class="who"><div class="name"><span class="swatch" style="background:${s.color}; color:${s.color}"></span>${esc(s.name)}</div></div>
           <div class="meta"><div class="pct">${s.finished ? '🏁' : Math.round(s.progress*100)+'%'}</div><div class="crash">${s.bump} crashes</div></div>
         </div>`).join('');
     }
 
-    // ---- board rendering ----
-    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-    function draw() {
-      ctx.clearRect(0, 0, GAME_W, GAME_H);
-      // finish zone
-      ctx.fillStyle = 'rgba(34,197,94,0.14)'; ctx.fillRect(0, 0, GAME_W, 28);
-      ctx.strokeStyle = 'rgba(34,197,94,0.55)'; ctx.setLineDash([9, 7]);
-      ctx.beginPath(); ctx.moveTo(0, 28); ctx.lineTo(GAME_W, 28); ctx.stroke(); ctx.setLineDash([]);
-      // obstacles
-      for (const o of obstacles) { ctx.fillStyle = o.moving ? '#ef4444' : '#64748b'; rr(o.x, o.y, o.w, o.h, 5); ctx.fill(); }
-      // sprites
-      for (const s of sprites) {
-        ctx.fillStyle = s.grace ? '#fca5a5' : s.color; rr(s.x, s.y, SPRITE_SIZE, SPRITE_SIZE, 6); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.fillRect(s.x + 5, s.y + 7, 4, 4); ctx.fillRect(s.x + SPRITE_SIZE - 9, s.y + 7, 4, 4);
-        if (s.team === leadTeam && !s.finished) { ctx.font = '16px sans-serif'; ctx.fillText('👑', s.x + 3, s.y - 4); }
-        if (s.finished) { ctx.font = 'bold 15px sans-serif'; ctx.fillText('🏁', s.x + 3, s.y + 18); }
-      }
-    }
-    function rr(x, y, w, h, r) {
-      ctx.beginPath(); ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
-    }
+    // ---- board + confetti rendering (shared renderers in board.js / confetti.js) ----
+    const board = Board.attach(document.getElementById('canvas'), { showLead: true });
+    const confetti = Confetti.attach(document.getElementById('confetti'), { count: 240, duration: 6500 });
 
     function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-
-    // ---- confetti celebration ----
-    const conf = document.getElementById('confetti'), cfx = conf.getContext('2d');
-    let confParts = [], confUntil = 0, confRAF = null;
-    let confColors = ['#fbbf24', '#38bdf8', '#22c55e', '#ef4444', '#f59e0b', '#a855f7'];
-    function sizeConf() { conf.width = innerWidth; conf.height = innerHeight; }
-    function newPart() {
-      return { x: Math.random() * conf.width, y: -20 - Math.random() * 300,
-        vx: (Math.random() - 0.5) * 3, vy: 4 + Math.random() * 5, s: 6 + Math.random() * 9,
-        c: confColors[Math.floor(Math.random() * confColors.length)], r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3 };
-    }
-    function launchConfetti(colors) {
-      if (colors && colors.length) confColors = colors;
-      sizeConf();
-      confParts = Array.from({ length: 240 }, newPart);
-      confUntil = performance.now() + 6500;
-      if (!confRAF) confRAF = requestAnimationFrame(confTick);
-    }
-    function stopConfetti() {
-      confUntil = 0; confParts = [];
-      if (confRAF) { cancelAnimationFrame(confRAF); confRAF = null; }
-      cfx.clearRect(0, 0, conf.width, conf.height);
-    }
-    function confTick(now) {
-      cfx.clearRect(0, 0, conf.width, conf.height);
-      for (const p of confParts) {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.r += p.vr;
-        if (p.y > conf.height + 20 && now < confUntil) { Object.assign(p, newPart()); p.y = -20; }
-        cfx.save(); cfx.translate(p.x, p.y); cfx.rotate(p.r); cfx.fillStyle = p.c;
-        cfx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); cfx.restore();
-      }
-      if (now < confUntil || confParts.some(p => p.y < conf.height + 20)) confRAF = requestAnimationFrame(confTick);
-      else { confRAF = null; cfx.clearRect(0, 0, conf.width, conf.height); }
-    }
-    addEventListener('resize', () => { if (confRAF) sizeConf(); });
 
     renderJoin();
     show('lobby', true);

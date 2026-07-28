@@ -89,6 +89,10 @@ After deploy, share the `*.workers.dev` URL with the office.
 | `src/index.js` | The Worker entry + the `GameRoom` Durable Object (players, sprites, obstacles, tick loop, win logic). One shared room named `main`. |
 | `public/index.html` | The player client — lobby, canvas board, d-pad, and the end-of-round reveal. |
 | `public/display.html` | The front-of-room dashboard (served at `/display`). |
+| `public/theme.css` | Shared "Space Race" design tokens + component classes used by every page. See `STYLE.md`. |
+| `public/board.js` | Shared canvas renderer for the race board (starfield, goal gate, hazards, sprite trails). |
+| `public/confetti.js` | Shared winner-confetti effect used by the phone client and the dashboard. |
+| `STYLE.md` | The style guide — how future features should use the tokens, components, and board renderer. |
 | `wrangler.toml` | Cloudflare config: static assets from `public/`, the Durable Object binding, and the SQLite migration. |
 
 The client protocol is deliberately thin: the phone sends every button press as
