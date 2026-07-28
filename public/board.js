@@ -58,6 +58,8 @@ const Board = (() => {
     const stars = makeStars();
     const trails = new Map();  // team -> [{x, y}]
     const trailT = new Map();  // team -> last-recorded timestamp
+    let youTeam = null;        // in "reveal" mode, the local player's own sprite
+    function setYou(team) { youTeam = (team === undefined ? null : team); }
 
     // Rendering is decoupled from packet timing with exponential smoothing:
     // every frame the drawn position eases a fraction of the way toward the
@@ -204,6 +206,22 @@ const Board = (() => {
         ctx.fillText(mk, s.x + SPRITE_SIZE / 2, s.y + SPRITE_SIZE / 2 + 0.5);
         ctx.restore();
 
+        // "Reveal / easy mode": ring + tag around the local player's own sprite
+        if (s.team === youTeam) {
+          const pulse = 0.5 + 0.5 * Math.sin(now / 220);
+          const pad = 4 + 2 * pulse;
+          ctx.save();
+          ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.4 * pulse})`;
+          ctx.lineWidth = 2.5;
+          roundRect(ctx, s.x - pad, s.y - pad, SPRITE_SIZE + 2 * pad, SPRITE_SIZE + 2 * pad, 9);
+          ctx.stroke();
+          ctx.font = 'bold 9px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fff';
+          ctx.fillText('YOU', s.x + SPRITE_SIZE / 2, s.y - pad - 3);
+          ctx.restore();
+        }
+
         if (opts.showLead && s.team === leadTeam && !s.finished) {
           ctx.font = '16px sans-serif';
           ctx.fillText('👑', s.x + 3, s.y - 4);
@@ -215,7 +233,7 @@ const Board = (() => {
       }
     }
 
-    return { draw, update, start, stop };
+    return { draw, update, start, stop, setYou };
   }
 
   function hexAlpha(hex, a) {

@@ -92,7 +92,7 @@ export class GameRoom {
     this.timer = GAME_SECONDS;
     this.nextId = 1;
     this.inputCount = 0; // total presses this race (aggregate — no ownership)
-    this.config = { seconds: GAME_SECONDS, difficulty: 'normal', teams: 'auto' };
+    this.config = { seconds: GAME_SECONDS, difficulty: 'normal', teams: 'auto', reveal: false };
     this.diff = DIFFICULTY.normal;
   }
 
@@ -227,7 +227,10 @@ export class GameRoom {
     const difficulty = DIFFICULTY[config.difficulty] ? config.difficulty : 'normal';
     const teamsNum = Number(config.teams);
     const teams = [2, 3, 4].includes(teamsNum) ? teamsNum : 'auto';
-    this.config = { seconds, difficulty, teams };
+    // "Easy mode": when reveal is on, each player is told their own sprite on
+    // start (turning off the hidden-sprite challenge).
+    const reveal = config.reveal === true;
+    this.config = { seconds, difficulty, teams, reveal };
     this.diff = DIFFICULTY[difficulty];
   }
 
@@ -267,10 +270,16 @@ export class GameRoom {
     this.buildObstacles();
     this.timer = this.config.seconds;
 
-    // Tell each player which button(s) they control — but still NOT which
-    // sprite is theirs. Then run a 3·2·1 countdown before movement is live.
+    // Tell each player which button(s) they control. Only when "reveal" is on
+    // do we also tell each player their own sprite (and only to that player —
+    // never to the shared dashboard). Then run the 3·2·1 countdown.
     for (const p of this.players.values()) {
-      this.send(p.ws, { type: 'start', dirs: p.dirs });
+      const msg = { type: 'start', dirs: p.dirs };
+      if (this.config.reveal && p.team !== null) {
+        const sp = this.sprites[p.team];
+        msg.you = { team: p.team, color: sp.color, name: sp.name };
+      }
+      this.send(p.ws, msg);
     }
     this.counting = true;
     this.gameStarted = false;
